@@ -120,9 +120,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if m.currentView == NEW_CONNECTION {
 		m.newConnectionModel, cmd = m.newConnectionModel.Update(msg)
-		if m.newConnectionModel.submitted {
+		if m.newConnectionModel.valid {
 			m.currentView = DATABASE_VIEW
-			return m, nil
 		}
 		return m, cmd
 	}

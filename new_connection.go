@@ -13,7 +13,7 @@ type NewConnectionModel struct {
 	focusIndex int
 	inputs     []textinput.Model
 	cursorMode cursor.Mode
-	submitted  bool
+	valid      bool
 }
 
 func InitialNewConnectionModel() NewConnectionModel {
@@ -44,6 +44,16 @@ func InitialNewConnectionModel() NewConnectionModel {
 	}
 
 	return m
+}
+
+func (m *NewConnectionModel) Validate() bool {
+	for i, input := range m.inputs {
+		if input.Value() == "" {
+			m.focusIndex = i - 1
+			return false
+		}
+	}
+	return true
 }
 
 func (m NewConnectionModel) Init() tea.Cmd {
@@ -77,8 +87,10 @@ func (m NewConnectionModel) Update(msg tea.Msg) (NewConnectionModel, tea.Cmd) {
 			// If so, exit.
 
 			if s == "enter" && m.focusIndex == len(m.inputs) {
-				m.submitted = true
-				return m, tea.Quit
+				if m.Validate() {
+					m.valid = true
+					return m, nil
+				}
 			}
 
 			// Cycle indexes
