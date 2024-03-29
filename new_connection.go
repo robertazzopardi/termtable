@@ -9,17 +9,34 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+type Action string
+
+const (
+	SUBMIT Action = "SUBMIT"
+	TEST   Action = "TEST"
+)
+
+var (
+	focusedButton = focusedStyle.Copy().Render("[ Submit ]")
+	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
+
+	focusedTestButton = focusedStyle.Copy().Render("[ Test ]")
+	blurredTestButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Test"))
+)
+
 type NewConnectionModel struct {
 	focusIndex int
 	inputs     []textinput.Model
 	cursorMode cursor.Mode
 	valid      bool
+	action     Action
 }
 
 func InitialNewConnectionModel() NewConnectionModel {
 	var newConnectionInputs = []string{"Connection's Name", "Host", "Port", "User", "Password", "Database Name"}
 	m := NewConnectionModel{
 		inputs: make([]textinput.Model, len(newConnectionInputs)),
+		action: SUBMIT,
 	}
 
 	var t textinput.Model
@@ -49,7 +66,9 @@ func InitialNewConnectionModel() NewConnectionModel {
 func (m *NewConnectionModel) Validate() bool {
 	for i, input := range m.inputs {
 		if input.Value() == "" {
-			m.focusIndex = i - 1
+			// m.focusIndex = i - 1
+			m.focusIndex = i
+			input.TextStyle = focusedStyle
 			return false
 		}
 	}
@@ -79,19 +98,35 @@ func (m NewConnectionModel) Update(msg tea.Msg) (NewConnectionModel, tea.Cmd) {
 			}
 			return m, tea.Batch(cmds...)
 
-		// Set focus to next input
-		case "tab", "shift+tab", "enter", "up", "down":
-			s := msg.String()
-
-			// Did the user press enter while the submit button was focused?
-			// If so, exit.
-
-			if s == "enter" && m.focusIndex == len(m.inputs) {
-				if m.Validate() {
-					m.valid = true
-					return m, nil
+		// Handle button actions
+		case "left", "right":
+			if m.focusIndex == len(m.inputs) {
+				if m.action == SUBMIT {
+					m.action = TEST
+				} else {
+					m.action = SUBMIT
 				}
 			}
+
+		case "enter":
+			if m.focusIndex == len(m.inputs) {
+				switch m.action {
+				case SUBMIT:
+					if m.Validate() {
+						m.valid = true
+						// return m, nil
+					}
+				case TEST:
+					fmt.Println("Test")
+				}
+
+			}
+
+			return m.updateInputStates()
+
+		// Set focus to next input
+		case "tab", "shift+tab", "up", "down":
+			s := msg.String()
 
 			// Cycle indexes
 			if s == "up" || s == "shift+tab" {
@@ -106,22 +141,7 @@ func (m NewConnectionModel) Update(msg tea.Msg) (NewConnectionModel, tea.Cmd) {
 				m.focusIndex = len(m.inputs)
 			}
 
-			cmds := make([]tea.Cmd, len(m.inputs))
-			for i := 0; i <= len(m.inputs)-1; i++ {
-				if i == m.focusIndex {
-					// Set focused state
-					cmds[i] = m.inputs[i].Focus()
-					m.inputs[i].PromptStyle = focusedStyle
-					m.inputs[i].TextStyle = focusedStyle
-					continue
-				}
-				// Remove focused state
-				m.inputs[i].Blur()
-				m.inputs[i].PromptStyle = noStyle
-				m.inputs[i].TextStyle = noStyle
-			}
-
-			return m, tea.Batch(cmds...)
+			return m.updateInputStates()
 		}
 	}
 
@@ -129,6 +149,25 @@ func (m NewConnectionModel) Update(msg tea.Msg) (NewConnectionModel, tea.Cmd) {
 	cmd := m.updateInputs(msg)
 
 	return m, cmd
+}
+
+func (m *NewConnectionModel) updateInputStates() (NewConnectionModel, tea.Cmd) {
+	cmds := make([]tea.Cmd, len(m.inputs))
+	for i := 0; i <= len(m.inputs)-1; i++ {
+		if i == m.focusIndex {
+			// Set focused state
+			cmds[i] = m.inputs[i].Focus()
+			m.inputs[i].PromptStyle = focusedStyle
+			m.inputs[i].TextStyle = focusedStyle
+			continue
+		}
+		// Remove focused state
+		m.inputs[i].Blur()
+		m.inputs[i].PromptStyle = noStyle
+		m.inputs[i].TextStyle = noStyle
+	}
+
+	return *m, tea.Batch(cmds...)
 }
 
 func (m *NewConnectionModel) updateInputs(msg tea.Msg) tea.Cmd {
@@ -153,11 +192,16 @@ func (m NewConnectionModel) View() string {
 		}
 	}
 
-	button := &blurredButton
+	submitButton := &blurredButton
+	testButton := &blurredTestButton
 	if m.focusIndex == len(m.inputs) {
-		button = &focusedButton
+		if m.action == SUBMIT {
+			submitButton = &focusedButton
+		} else {
+			testButton = &focusedTestButton
+		}
 	}
-	fmt.Fprintf(&b, "\n\n%s\n\n", *button)
+	fmt.Fprintf(&b, "\n\n%s%s\n\n", *submitButton, *testButton)
 
 	b.WriteString(helpStyle.Render("cursor mode is "))
 	b.WriteString(cursorModeHelpStyle.Render(m.cursorMode.String()))
