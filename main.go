@@ -11,6 +11,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+type CurrentView string
+
+const (
+	DEFAULT         CurrentView = "DEFAULT"
+	NEW_CONNECTION  CurrentView = "NEW_CONNECTION"
+	EDIT_CONNECTION CurrentView = "EDIT_CONNECTION"
+	JOIN_EXISTING   CurrentView = "JOIN_EXISTING"
+	DATABASE_VIEW   CurrentView = "DATABASE_VIEW"
+	QUITTING        CurrentView = "QUITTING"
+)
+
 const listHeight = 14
 
 var (
@@ -61,8 +72,7 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 type model struct {
 	list               list.Model
 	newConnectionModel NewConnectionModel
-	choice             string
-	quitting           bool
+	currentView        CurrentView
 }
 
 type (
@@ -80,27 +90,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		switch keypress := msg.String(); keypress {
-		case "q", "ctrl+c":
-			m.quitting = true
-			return m, nil
+		if m.currentView == DEFAULT {
+			switch keypress := msg.String(); keypress {
+			case "q", "ctrl+c":
+				m.currentView = QUITTING
+				return m, nil
 
-		case "enter":
-			i, ok := m.list.SelectedItem().(item)
-			if ok {
-				m.choice = string(i)
+			case "enter":
+				i, ok := m.list.SelectedItem().(item)
+				if ok {
+					// m.choice = string(i)
+					switch string(i) {
+					case "New Connection":
+						m.currentView = NEW_CONNECTION
+					case "Edit Connection":
+						m.currentView = EDIT_CONNECTION
+					case "Join Existing":
+						m.currentView = JOIN_EXISTING
+						// default:
+						// 	m.currentView = DEFAULT
+					}
+				}
+				return m, nil
 			}
-			return m, nil
 		}
 	}
 
 	var cmd tea.Cmd
 
-	if m.choice != "" {
-		if m.choice == "New Connection" {
-			m.newConnectionModel, cmd = m.newConnectionModel.Update(msg)
-			return m, cmd
+	if m.currentView == NEW_CONNECTION {
+		m.newConnectionModel, cmd = m.newConnectionModel.Update(msg)
+		if m.newConnectionModel.submitted {
+			m.currentView = DATABASE_VIEW
+			return m, nil
 		}
+		return m, cmd
 	}
 
 	m.list, cmd = m.list.Update(msg)
@@ -108,17 +132,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	if m.choice != "" {
-		if m.choice == "New Connection" {
-			return quitTextStyle.Render(fmt.Sprintf("%4s", m.newConnectionModel.View()))
-		} else {
-			return quitTextStyle.Render(fmt.Sprintf("%s? Sounds good to me.", m.choice))
-		}
+	switch m.currentView {
+	case NEW_CONNECTION:
+		return quitTextStyle.Render(fmt.Sprintf("%4s", m.newConnectionModel.View()))
+	case EDIT_CONNECTION:
+		return quitTextStyle.Render("Edit Connection")
+	case JOIN_EXISTING:
+		return quitTextStyle.Render("Join Existing")
+	case DATABASE_VIEW:
+		return quitTextStyle.Render("Database View")
+	case QUITTING:
+		return quitTextStyle.Render("Are you sure you want to quit? (ctrl+c/esc again)")
+	default:
+		return "\n" + m.list.View()
 	}
-	if m.quitting {
-		return quitTextStyle.Render("Not hungry? That’s cool.")
-	}
-	return "\n" + m.list.View()
 }
 
 func main() {
@@ -138,7 +165,7 @@ func main() {
 	l.Styles.PaginationStyle = paginationStyle
 	l.Styles.HelpStyle = helpStyle
 
-	m := model{list: l, newConnectionModel: InitialNewConnectionModel()}
+	m := model{list: l, newConnectionModel: InitialNewConnectionModel(), currentView: DEFAULT}
 
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		fmt.Println("Error running program:", err)

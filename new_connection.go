@@ -13,12 +13,14 @@ type NewConnectionModel struct {
 	focusIndex int
 	inputs     []textinput.Model
 	cursorMode cursor.Mode
+	submitted  bool
 }
 
 func InitialNewConnectionModel() NewConnectionModel {
 	var newConnectionInputs = []string{"Connection's Name", "Host", "Port", "User", "Password", "Database Name"}
 	m := NewConnectionModel{
-		inputs: make([]textinput.Model, len(newConnectionInputs))}
+		inputs: make([]textinput.Model, len(newConnectionInputs)),
+	}
 
 	var t textinput.Model
 	for i, value := range newConnectionInputs {
@@ -73,7 +75,9 @@ func (m NewConnectionModel) Update(msg tea.Msg) (NewConnectionModel, tea.Cmd) {
 
 			// Did the user press enter while the submit button was focused?
 			// If so, exit.
+
 			if s == "enter" && m.focusIndex == len(m.inputs) {
+				m.submitted = true
 				return m, tea.Quit
 			}
 
