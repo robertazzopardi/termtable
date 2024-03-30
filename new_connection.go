@@ -17,26 +17,38 @@ const (
 )
 
 var (
-	focusedButton = focusedStyle.Copy().Render("[ Submit ]")
-	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
+	focusedButton       = focusedStyle.Copy().Render("[ Submit ]")
+	blurredButton       = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
+	errorSubmitButton   = fmt.Sprintf("[ %s ]", errorStyle.Render("Submit"))
+	successSubmitButton = fmt.Sprintf("[ %s ]", successStyle.Render("Submit"))
 
 	focusedTestButton = focusedStyle.Copy().Render("[ Test ]")
 	blurredTestButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Test"))
+	errorTestButton   = fmt.Sprintf("[ %s ]", errorStyle.Render("Test"))
+	successTestButton = fmt.Sprintf("[ %s ]", successStyle.Render("Test"))
 )
 
 type NewConnectionModel struct {
-	focusIndex int
-	inputs     []textinput.Model
-	cursorMode cursor.Mode
-	valid      bool
-	action     Action
+	focusIndex     int
+	inputs         []textinput.Model
+	cursorMode     cursor.Mode
+	valid          bool
+	testConnPassed *bool
+	action         Action
 }
 
 func InitialNewConnectionModel() NewConnectionModel {
-	var newConnectionInputs = []string{"Connection's Name", "Host", "Port", "User", "Password", "Database Name"}
+	var newConnectionInputs = []string{
+		"Host",
+		"Port",
+		"User",
+		"Pass",
+		"Name",
+	}
 	m := NewConnectionModel{
-		inputs: make([]textinput.Model, len(newConnectionInputs)),
-		action: SUBMIT,
+		inputs:         make([]textinput.Model, len(newConnectionInputs)),
+		action:         SUBMIT,
+		testConnPassed: nil,
 	}
 
 	var t textinput.Model
@@ -48,11 +60,11 @@ func InitialNewConnectionModel() NewConnectionModel {
 
 		if i == 0 {
 			t.Focus()
-			t.PromptStyle = focusedStyle
-			t.TextStyle = focusedStyle
+			t.PromptStyle = focusedItemStyle
+			t.TextStyle = focusedItemStyle
 		}
 
-		if value == "Password" {
+		if value == "Pass" {
 			t.EchoMode = textinput.EchoPassword
 			t.EchoCharacter = '•'
 		}
@@ -68,7 +80,7 @@ func (m *NewConnectionModel) Validate() bool {
 		if input.Value() == "" {
 			// m.focusIndex = i - 1
 			m.focusIndex = i
-			input.TextStyle = focusedStyle
+			input.TextStyle = focusedItemStyle
 			return false
 		}
 	}
@@ -108,16 +120,31 @@ func (m NewConnectionModel) Update(msg tea.Msg) (NewConnectionModel, tea.Cmd) {
 				}
 			}
 
+			if m.testConnPassed != nil {
+				m.testConnPassed = nil
+			}
+
 		case "enter":
 			if m.focusIndex == len(m.inputs) {
 				switch m.action {
 				case SUBMIT:
 					if m.Validate() {
 						m.valid = true
-						// return m, nil
 					}
 				case TEST:
-					fmt.Println("Test")
+					if m.Validate() {
+						connection := ConnectionParams{
+							Host: m.inputs[0].Value(),
+							Port: m.inputs[1].Value(),
+							User: m.inputs[2].Value(),
+							Pass: m.inputs[3].Value(),
+							Name: m.inputs[4].Value(),
+						}
+						if m.testConnPassed == nil {
+							m.testConnPassed = new(bool)
+							*m.testConnPassed = connection.TestConnection()
+						}
+					}
 				}
 
 			}
@@ -157,8 +184,8 @@ func (m *NewConnectionModel) updateInputStates() (NewConnectionModel, tea.Cmd) {
 		if i == m.focusIndex {
 			// Set focused state
 			cmds[i] = m.inputs[i].Focus()
-			m.inputs[i].PromptStyle = focusedStyle
-			m.inputs[i].TextStyle = focusedStyle
+			m.inputs[i].PromptStyle = focusedItemStyle
+			m.inputs[i].TextStyle = focusedItemStyle
 			continue
 		}
 		// Remove focused state
@@ -195,10 +222,19 @@ func (m NewConnectionModel) View() string {
 	submitButton := &blurredButton
 	testButton := &blurredTestButton
 	if m.focusIndex == len(m.inputs) {
-		if m.action == SUBMIT {
+		switch m.action {
+		case SUBMIT:
 			submitButton = &focusedButton
-		} else {
-			testButton = &focusedTestButton
+		case TEST:
+			if m.testConnPassed != nil {
+				if *m.testConnPassed {
+					testButton = &successTestButton
+				} else {
+					testButton = &errorTestButton
+				}
+			} else {
+				testButton = &focusedTestButton
+			}
 		}
 	}
 	fmt.Fprintf(&b, "\n\n%s%s\n\n", *submitButton, *testButton)

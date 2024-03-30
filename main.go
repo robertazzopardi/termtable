@@ -24,19 +24,34 @@ const (
 
 const listHeight = 14
 
-var (
-	titleStyle        = lipgloss.NewStyle().MarginLeft(2)
-	itemStyle         = lipgloss.NewStyle().PaddingLeft(4)
-	selectedItemStyle = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color("170"))
-	paginationStyle   = list.DefaultStyles().PaginationStyle.PaddingLeft(4)
-	quitTextStyle     = lipgloss.NewStyle().Margin(1, 0, 2, 4)
-	helpStyle         = blurredStyle.Copy()
+// Primary ansi colours
+const (
+	WHITE      = "15"
+	RED        = "1"
+	GREEN      = "2"
+	YELLOW     = "3"
+	BLUE       = "4"
+	MAGENTA    = "5"
+	GREY       = "240"
+	LIGHT_GREY = "244"
+)
 
-	focusedStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	blurredStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	cursorStyle         = focusedStyle.Copy()
-	noStyle             = lipgloss.NewStyle()
-	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+var (
+	titleStyle      = lipgloss.NewStyle().MarginLeft(2)
+	itemStyle       = lipgloss.NewStyle().PaddingLeft(4)
+	paginationStyle = list.DefaultStyles().PaginationStyle.PaddingLeft(4)
+	quitTextStyle   = lipgloss.NewStyle().Margin(1, 0, 2, 4)
+	helpStyle       = blurredStyle.Copy()
+	cursorStyle     = focusedItemStyle.Copy()
+	noStyle         = lipgloss.NewStyle()
+
+	selectedItemStyle   = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color(MAGENTA))
+	focusedItemStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color(RED))
+	focusedStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color(WHITE))
+	blurredStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color(GREY))
+	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(LIGHT_GREY))
+	successStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color(GREEN))
+	errorStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color(RED))
 )
 
 type item string
