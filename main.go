@@ -87,10 +87,6 @@ type model struct {
 	currentView        CurrentView
 }
 
-type (
-	tickMsg struct{}
-)
-
 func (m model) Init() tea.Cmd {
 	return nil
 }
