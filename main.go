@@ -85,6 +85,8 @@ type model struct {
 	list               list.Model
 	newConnectionModel NewConnectionModel
 	currentView        CurrentView
+	currentConnection  *Connection
+	openDatabase       *OpenDatabase
 }
 
 func (m model) Init() tea.Cmd {
@@ -92,13 +94,43 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch m.currentView {
+	case NEW_CONNECTION:
+		m.newConnectionModel, cmd = m.newConnectionModel.Update(msg)
+		if m.newConnectionModel.connection != nil {
+			m.currentView = DATABASE_VIEW
+			m.currentConnection = m.newConnectionModel.connection
+
+			openDatabase := NewOpenDatabase(m.currentConnection)
+			m.openDatabase = &openDatabase
+		}
+		return m, cmd
+
+	case DATABASE_VIEW:
+		if openDatabase := *m.openDatabase; m.openDatabase != nil {
+			openDatabase, cmd = openDatabase.Update(msg)
+			if openDatabase.connParams == nil {
+				m.currentView = DEFAULT
+				m.openDatabase = nil
+				m.currentConnection = nil
+
+			}
+		}
+		return m, cmd
+	}
+
+	// Handle the default view
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.list.SetWidth(msg.Width)
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.currentView == DEFAULT {
+		switch m.currentView {
+		case DEFAULT:
 			switch keypress := msg.String(); keypress {
 			case "q", "ctrl+c":
 				m.currentView = QUITTING
@@ -121,17 +153,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-		}
-	}
 
-	var cmd tea.Cmd
-
-	if m.currentView == NEW_CONNECTION {
-		m.newConnectionModel, cmd = m.newConnectionModel.Update(msg)
-		if m.newConnectionModel.valid {
-			m.currentView = DATABASE_VIEW
 		}
-		return m, cmd
 	}
 
 	m.list, cmd = m.list.Update(msg)
@@ -147,7 +170,7 @@ func (m model) View() string {
 	case JOIN_EXISTING:
 		return quitTextStyle.Render("Join Existing")
 	case DATABASE_VIEW:
-		return quitTextStyle.Render("Database View")
+		return quitTextStyle.Render(fmt.Sprintf("%4s", m.openDatabase.View()))
 	case QUITTING:
 		return quitTextStyle.Render("Are you sure you want to quit? (ctrl+c/esc again)")
 	default:

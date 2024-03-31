@@ -32,7 +32,7 @@ type NewConnectionModel struct {
 	focusIndex     int
 	inputs         []textinput.Model
 	cursorMode     cursor.Mode
-	valid          bool
+	connection     *Connection
 	testConnPassed *bool
 	action         Action
 }
@@ -75,16 +75,24 @@ func InitialNewConnectionModel() NewConnectionModel {
 	return m
 }
 
-func (m *NewConnectionModel) Validate() bool {
+func (m *NewConnectionModel) Validate() *Connection {
 	for i, input := range m.inputs {
 		if input.Value() == "" {
-			// m.focusIndex = i - 1
 			m.focusIndex = i
 			input.TextStyle = focusedItemStyle
-			return false
+			return nil
 		}
 	}
-	return true
+
+	connection := Connection{
+		Host: m.inputs[0].Value(),
+		Port: m.inputs[1].Value(),
+		User: m.inputs[2].Value(),
+		Pass: m.inputs[3].Value(),
+		Name: m.inputs[4].Value(),
+	}
+
+	return &connection
 }
 
 func (m NewConnectionModel) Init() tea.Cmd {
@@ -126,25 +134,21 @@ func (m NewConnectionModel) Update(msg tea.Msg) (NewConnectionModel, tea.Cmd) {
 
 		case "enter":
 			if m.focusIndex == len(m.inputs) {
+				conn := m.Validate()
+
 				switch m.action {
 				case SUBMIT:
-					if m.Validate() {
-						m.valid = true
+					if conn != nil {
+						if conn.TestConnection() {
+							m.connection = conn
+						}
 					}
 				case TEST:
-					if m.Validate() {
-						connection := ConnectionParams{
-							Host: m.inputs[0].Value(),
-							Port: m.inputs[1].Value(),
-							User: m.inputs[2].Value(),
-							Pass: m.inputs[3].Value(),
-							Name: m.inputs[4].Value(),
-						}
-						if m.testConnPassed == nil {
-							m.testConnPassed = new(bool)
-							*m.testConnPassed = connection.TestConnection()
-						}
+					if conn != nil && m.testConnPassed == nil {
+						m.testConnPassed = new(bool)
+						*m.testConnPassed = conn.TestConnection()
 					}
+
 				}
 
 			}

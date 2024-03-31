@@ -1,12 +1,10 @@
-version: '3.9'
-
 services:
   pgdb:
     image: postgres:latest
     restart: always
     environment:
-      POSTGRES_PASSWORD: super_secure_password
-      POSTGRES_USER: termtable_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_USER: termtable
       POSTGRES_DB: termtable
     ports:
       - "5432:5432"
