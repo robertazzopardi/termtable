@@ -7,12 +7,20 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type ConnectionStatus string
+
+const (
+	CONNECTED    ConnectionStatus = "CONNECTED"
+	DISCONNECTED ConnectionStatus = "DISCONNECTED"
+)
+
 type Connection struct {
-	Host string
-	Port string
-	User string
-	Pass string
-	Name string
+	Host   string
+	Port   string
+	User   string
+	Pass   string
+	Name   string
+	status ConnectionStatus
 }
 
 func (params Connection) ConnectionString() string {
@@ -20,17 +28,19 @@ func (params Connection) ConnectionString() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", params.User, params.Pass, params.Host, params.Port, params.Name)
 }
 
-func (params Connection) TestConnection() bool {
+func (params *Connection) TestConnection() TestStatus {
 	connectionString := params.ConnectionString()
 	conn, err := pgx.Connect(context.Background(), connectionString)
 
 	if err != nil {
-		return false
+		params.status = DISCONNECTED
+		return FAILED
 	}
 
 	conn.Close(context.Background())
 
-	return true
+	params.status = CONNECTED
+	return PASSED
 }
 
 func (parmas Connection) GetTableNames() []string {

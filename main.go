@@ -19,7 +19,6 @@ const (
 	EDIT_CONNECTION CurrentView = "EDIT_CONNECTION"
 	JOIN_EXISTING   CurrentView = "JOIN_EXISTING"
 	DATABASE_VIEW   CurrentView = "DATABASE_VIEW"
-	QUITTING        CurrentView = "QUITTING"
 )
 
 const listHeight = 14
@@ -85,7 +84,7 @@ type model struct {
 	list               list.Model
 	newConnectionModel NewConnectionModel
 	currentView        CurrentView
-	currentConnection  *Connection
+	currentConnection  Connection
 	openDatabase       *OpenDatabase
 }
 
@@ -98,8 +97,7 @@ func (m model) updateEvents(msg tea.Msg, cmd tea.Cmd) (model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch keypress := msg.String(); keypress {
 		case "q", "ctrl+c":
-			m.currentView = QUITTING
-			return m, nil
+			return m, tea.Quit
 
 		case "enter":
 			i, ok := m.list.SelectedItem().(item)
@@ -133,29 +131,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.currentView {
 	case NEW_CONNECTION:
 		m.newConnectionModel, cmd = m.newConnectionModel.Update(msg)
-		if m.newConnectionModel.connection != nil {
+		if m.newConnectionModel.connection.status == CONNECTED {
 			m.currentView = DATABASE_VIEW
 			m.currentConnection = m.newConnectionModel.connection
 
-			openDatabase := NewOpenDatabase(m.currentConnection)
+			openDatabase := NewOpenDatabase(&m.currentConnection)
 			m.openDatabase = &openDatabase
 		}
 
 	case DATABASE_VIEW:
 		if openDatabase := *m.openDatabase; m.openDatabase != nil {
 			openDatabase, cmd = openDatabase.Update(msg)
-			if openDatabase.connParams == nil {
+			if openDatabase.viewMode == QUIT {
 				m.currentView = DEFAULT
 				m.openDatabase = nil
-				m.currentConnection = nil
 			}
 		}
 
 	case DEFAULT:
 		m, cmd = m.updateEvents(msg, cmd)
 	}
-
-	// Handle the default view
 
 	return m, cmd
 }
@@ -170,8 +165,6 @@ func (m model) View() string {
 		return quitTextStyle.Render("Join Existing")
 	case DATABASE_VIEW:
 		return quitTextStyle.Render(fmt.Sprintf("%4s", m.openDatabase.View()))
-	case QUITTING:
-		return quitTextStyle.Render("Are you sure you want to quit? (ctrl+c/esc again)")
 	default:
 		return "\n" + m.list.View()
 	}

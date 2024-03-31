@@ -16,6 +16,14 @@ const (
 	TEST   Action = "TEST"
 )
 
+type TestStatus string
+
+const (
+	PASSED TestStatus = "PASSED"
+	FAILED TestStatus = "FAILED"
+	NA     TestStatus = "NA"
+)
+
 var (
 	focusedButton = focusedStyle.Copy().Render("[ Submit ]")
 	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
@@ -29,12 +37,12 @@ var (
 )
 
 type NewConnectionModel struct {
-	focusIndex     int
-	inputs         []textinput.Model
-	cursorMode     cursor.Mode
-	connection     *Connection
-	testConnPassed *bool
-	action         Action
+	focusIndex int
+	inputs     []textinput.Model
+	cursorMode cursor.Mode
+	connection Connection
+	testStatus TestStatus
+	action     Action
 }
 
 func InitialNewConnectionModel() NewConnectionModel {
@@ -46,9 +54,9 @@ func InitialNewConnectionModel() NewConnectionModel {
 		"Name",
 	}
 	m := NewConnectionModel{
-		inputs:         make([]textinput.Model, len(newConnectionInputs)),
-		action:         SUBMIT,
-		testConnPassed: nil,
+		inputs:     make([]textinput.Model, len(newConnectionInputs)),
+		action:     SUBMIT,
+		testStatus: NA,
 	}
 
 	var t textinput.Model
@@ -73,26 +81,6 @@ func InitialNewConnectionModel() NewConnectionModel {
 	}
 
 	return m
-}
-
-func (m *NewConnectionModel) Validate() *Connection {
-	for i, input := range m.inputs {
-		if input.Value() == "" {
-			m.focusIndex = i
-			input.TextStyle = focusedItemStyle
-			return nil
-		}
-	}
-
-	connection := Connection{
-		Host: m.inputs[0].Value(),
-		Port: m.inputs[1].Value(),
-		User: m.inputs[2].Value(),
-		Pass: m.inputs[3].Value(),
-		Name: m.inputs[4].Value(),
-	}
-
-	return &connection
 }
 
 func (m NewConnectionModel) Init() tea.Cmd {
@@ -128,25 +116,29 @@ func (m NewConnectionModel) Update(msg tea.Msg) (NewConnectionModel, tea.Cmd) {
 				}
 			}
 
-			if m.testConnPassed != nil {
-				m.testConnPassed = nil
+			if m.testStatus != NA {
+				m.testStatus = NA
 			}
 
 		case "enter":
 			if m.focusIndex == len(m.inputs) {
-				conn := m.Validate()
+				conn := Connection{
+					Host:   m.inputs[0].Value(),
+					Port:   m.inputs[1].Value(),
+					User:   m.inputs[2].Value(),
+					Pass:   m.inputs[3].Value(),
+					Name:   m.inputs[4].Value(),
+					status: DISCONNECTED,
+				}
 
 				switch m.action {
 				case SUBMIT:
-					if conn != nil {
-						if conn.TestConnection() {
-							m.connection = conn
-						}
+					if conn.TestConnection() == PASSED {
+						m.connection = conn
 					}
 				case TEST:
-					if conn != nil && m.testConnPassed == nil {
-						m.testConnPassed = new(bool)
-						*m.testConnPassed = conn.TestConnection()
+					if m.testStatus == NA {
+						m.testStatus = conn.TestConnection()
 					}
 
 				}
@@ -230,13 +222,12 @@ func (m NewConnectionModel) View() string {
 		case SUBMIT:
 			submitButton = &focusedButton
 		case TEST:
-			if m.testConnPassed != nil {
-				if *m.testConnPassed {
-					testButton = &successTestButton
-				} else {
-					testButton = &errorTestButton
-				}
-			} else {
+			switch m.testStatus {
+			case PASSED:
+				testButton = &successTestButton
+			case FAILED:
+				testButton = &errorTestButton
+			case NA:
 				testButton = &focusedTestButton
 			}
 		}

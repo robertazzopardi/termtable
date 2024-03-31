@@ -28,20 +28,22 @@ type ViewMode string
 const (
 	COLUMNS ViewMode = "COLUMNS"
 	OPEN    ViewMode = "OPEN"
+	QUIT    ViewMode = "QUIT"
 )
 
 type OpenDatabase struct {
-	tables     []textinput.Model
-	connParams *Connection
-	viewMode   ViewMode
+	tables   []textinput.Model
+	viewMode ViewMode
+	name     string
 }
 
 func NewOpenDatabase(connParams *Connection) OpenDatabase {
 	databaseTables := connParams.GetTableNames()
 
 	openDatabase := OpenDatabase{
-		tables:     make([]textinput.Model, len(databaseTables)),
-		connParams: connParams,
+		tables:   make([]textinput.Model, len(databaseTables)),
+		viewMode: COLUMNS,
+		name:     connParams.Name,
 	}
 
 	var t textinput.Model
@@ -50,7 +52,6 @@ func NewOpenDatabase(connParams *Connection) OpenDatabase {
 		t.Cursor.Style = cursorStyle
 		t.CharLimit = 32
 		t.Placeholder = value
-
 		if i == 0 {
 			t.Focus()
 			t.PromptStyle = focusedItemStyle
@@ -83,8 +84,7 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q":
-			db.connParams = nil
-			return db, nil
+			db.viewMode = QUIT
 
 		case "left", "right":
 			if db.viewMode == COLUMNS {
@@ -100,14 +100,14 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 }
 
 func (db OpenDatabase) View() string {
-	s := fmt.Sprintf("%s\n\n", db.connParams.Name)
+	s := fmt.Sprintf("%s\n\n", db.name)
 
 	tableLabels := db.tableView()
 
 	if db.viewMode == COLUMNS {
-		s += lipgloss.JoinHorizontal(lipgloss.Top, modelStyle.Render(tableLabels), focusedModelStyle.Render("Table"))
-	} else {
 		s += lipgloss.JoinHorizontal(lipgloss.Top, focusedModelStyle.Render(tableLabels), modelStyle.Render("Table"))
+	} else {
+		s += lipgloss.JoinHorizontal(lipgloss.Top, modelStyle.Render(tableLabels), focusedModelStyle.Render("Table"))
 	}
 
 	return s
