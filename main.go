@@ -89,6 +89,40 @@ type model struct {
 	openDatabase       *OpenDatabase
 }
 
+func (m model) updateEvents(msg tea.Msg, cmd tea.Cmd) (model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.list.SetWidth(msg.Width)
+		return m, nil
+
+	case tea.KeyMsg:
+		switch keypress := msg.String(); keypress {
+		case "q", "ctrl+c":
+			m.currentView = QUITTING
+			return m, nil
+
+		case "enter":
+			i, ok := m.list.SelectedItem().(item)
+			if ok {
+				switch string(i) {
+				case "New Connection":
+					m.currentView = NEW_CONNECTION
+				case "Edit Connection":
+					m.currentView = EDIT_CONNECTION
+				case "Join Existing":
+					m.currentView = JOIN_EXISTING
+					// default:
+					// 	m.currentView = DEFAULT
+				}
+			}
+			return m, nil
+		}
+	}
+
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
+}
+
 func (m model) Init() tea.Cmd {
 	return nil
 }
@@ -106,7 +140,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			openDatabase := NewOpenDatabase(m.currentConnection)
 			m.openDatabase = &openDatabase
 		}
-		return m, cmd
 
 	case DATABASE_VIEW:
 		if openDatabase := *m.openDatabase; m.openDatabase != nil {
@@ -115,49 +148,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentView = DEFAULT
 				m.openDatabase = nil
 				m.currentConnection = nil
-
 			}
 		}
-		return m, cmd
+
+	case DEFAULT:
+		m, cmd = m.updateEvents(msg, cmd)
 	}
 
 	// Handle the default view
 
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.list.SetWidth(msg.Width)
-		return m, nil
-
-	case tea.KeyMsg:
-		switch m.currentView {
-		case DEFAULT:
-			switch keypress := msg.String(); keypress {
-			case "q", "ctrl+c":
-				m.currentView = QUITTING
-				return m, nil
-
-			case "enter":
-				i, ok := m.list.SelectedItem().(item)
-				if ok {
-					// m.choice = string(i)
-					switch string(i) {
-					case "New Connection":
-						m.currentView = NEW_CONNECTION
-					case "Edit Connection":
-						m.currentView = EDIT_CONNECTION
-					case "Join Existing":
-						m.currentView = JOIN_EXISTING
-						// default:
-						// 	m.currentView = DEFAULT
-					}
-				}
-				return m, nil
-			}
-
-		}
-	}
-
-	m.list, cmd = m.list.Update(msg)
 	return m, cmd
 }
 
