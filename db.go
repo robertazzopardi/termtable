@@ -71,3 +71,44 @@ func (parmas Connection) GetTableNames() []string {
 
 	return tableNames
 }
+
+type Table struct {
+	fields []string
+	values [][]string
+}
+
+func (params Connection) SelectAll(table string) (Table, error) {
+	connectionString := params.ConnectionString()
+	conn, err := pgx.Connect(context.Background(), connectionString)
+
+	if err != nil {
+		return Table{}, err
+	}
+
+	rows, err := conn.Query(context.Background(), fmt.Sprintf("SELECT * FROM %s", table))
+
+	if err != nil {
+		return Table{}, err
+	}
+
+	var tableData Table
+
+	fieldDescriptions := rows.FieldDescriptions()
+	tableData.fields = make([]string, len(fieldDescriptions))
+	for i, field := range fieldDescriptions {
+		tableData.fields[i] = field.Name
+	}
+
+	for rows.Next() {
+		var values []string
+		err = rows.Scan(values)
+		if err != nil {
+			return Table{}, err
+		}
+		tableData.values = append(tableData.values, values)
+	}
+
+	conn.Close(context.Background())
+
+	return tableData, nil
+}
