@@ -85,7 +85,7 @@ type model struct {
 	newConnectionModel NewConnectionModel
 	currentView        CurrentView
 	currentConnection  Connection
-	openDatabase       *OpenDatabase
+	openDatabase       OpenDatabase
 }
 
 func (m model) updateEvents(msg tea.Msg, cmd tea.Cmd) (model, tea.Cmd) {
@@ -111,8 +111,6 @@ func (m model) updateEvents(msg tea.Msg, cmd tea.Cmd) (model, tea.Cmd) {
 					m.currentView = EDIT_CONNECTION
 				case "Join Existing":
 					m.currentView = JOIN_EXISTING
-					// default:
-					// 	m.currentView = DEFAULT
 				}
 			}
 			return m, nil
@@ -138,16 +136,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.currentConnection = m.newConnectionModel.connection
 
 			openDatabase := NewOpenDatabase(&m.currentConnection)
-			m.openDatabase = &openDatabase
+			m.openDatabase = openDatabase
 		}
 
 	case DATABASE_VIEW:
-		if openDatabase := *m.openDatabase; m.openDatabase != nil {
-			openDatabase, cmd = openDatabase.Update(msg)
-			if openDatabase.viewMode == QUIT {
-				m.currentView = DEFAULT
-				m.openDatabase = nil
-			}
+		m.openDatabase, cmd = m.openDatabase.Update(msg)
+		if m.openDatabase.viewMode == QUIT {
+			m.currentView = DEFAULT
+			m.openDatabase = OpenDatabase{}
 		}
 
 	case DEFAULT:
