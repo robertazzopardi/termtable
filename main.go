@@ -105,6 +105,8 @@ func (m model) updateEvents(msg tea.Msg, cmd tea.Cmd) (model, tea.Cmd) {
 				switch string(i) {
 				case "New Connection":
 					m.currentView = NEW_CONNECTION
+					m.newConnectionModel =
+						InitialNewConnectionModel()
 				case "Edit Connection":
 					m.currentView = EDIT_CONNECTION
 				case "Join Existing":
@@ -187,7 +189,7 @@ func main() {
 	l.Styles.PaginationStyle = paginationStyle
 	l.Styles.HelpStyle = helpStyle
 
-	m := model{list: l, newConnectionModel: InitialNewConnectionModel(), currentView: DEFAULT}
+	m := model{list: l, currentView: DEFAULT}
 
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		fmt.Println("Error running program:", err)
