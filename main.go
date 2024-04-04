@@ -135,7 +135,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.currentView = DATABASE_VIEW
 			m.currentConnection = m.newConnectionModel.connection
 
-			openDatabase := NewOpenDatabase(&m.currentConnection)
+			openDatabase := NewOpenDatabase(m.currentConnection)
 			m.openDatabase = openDatabase
 		}
 
@@ -156,13 +156,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	switch m.currentView {
 	case NEW_CONNECTION:
-		return quitTextStyle.Render(fmt.Sprintf("%4s", m.newConnectionModel.View()))
+		return quitTextStyle.Render(m.newConnectionModel.View())
 	case EDIT_CONNECTION:
 		return quitTextStyle.Render("Edit Connection")
 	case JOIN_EXISTING:
 		return quitTextStyle.Render("Join Existing")
 	case DATABASE_VIEW:
-		return quitTextStyle.Render(fmt.Sprintf("%4s", m.openDatabase.View()))
+		return quitTextStyle.Render(m.openDatabase.View())
 	default:
 		return "\n" + m.list.View()
 	}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -34,6 +35,11 @@ var (
 	selectedTableStyle = lipgloss.
 				NewStyle().
 				Foreground(lipgloss.Color(MAGENTA))
+
+	baseStyle = lipgloss.
+			NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("240"))
 )
 
 type ViewMode string
@@ -70,12 +76,13 @@ func (d tableItemDelegate) Render(w io.Writer, m list.Model, index int, listItem
 }
 
 type OpenDatabase struct {
-	tables   list.Model
-	viewMode ViewMode
-	name     string
+	tables        list.Model
+	viewMode      ViewMode
+	selectedTable table.Model
+	params        Connection
 }
 
-func NewOpenDatabase(connParams *Connection) OpenDatabase {
+func NewOpenDatabase(connParams Connection) OpenDatabase {
 	databaseTables := connParams.GetTableNames()
 
 	listItems := []list.Item{}
@@ -86,14 +93,65 @@ func NewOpenDatabase(connParams *Connection) OpenDatabase {
 	openDatabase := OpenDatabase{
 		tables:   list.New(listItems, tableItemDelegate{}, 14, 14),
 		viewMode: COLUMNS,
-		name:     connParams.Name,
+		params:   connParams,
 	}
 
 	openDatabase.tables.SetShowHelp(false)
 	openDatabase.tables.SetShowTitle(false)
 	openDatabase.tables.SetShowStatusBar(false)
 
+	selectedTable, err := openDatabase.openTable(databaseTables[0])
+
+	if err != nil {
+		connParams.status = DISCONNECTED
+		return OpenDatabase{}
+	}
+
+	openDatabase.selectedTable = selectedTable
+
 	return openDatabase
+}
+
+func (db OpenDatabase) openTable(tableName string) (table.Model, error) {
+	tableData, err := db.params.SelectAll(tableName)
+
+	if err != nil {
+		return table.Model{}, err
+	}
+
+	columns := make([]table.Column, len(tableData.fields))
+	for i, field := range tableData.fields {
+		columns[i] = table.Column{Title: field, Width: len(field) + 2}
+	}
+
+	rows := make([]table.Row, len(tableData.values))
+	for i, value := range tableData.values {
+		rows[i] = make(table.Row, len(value))
+		for j, v := range value {
+			rows[i][j] = v
+		}
+	}
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(7),
+	)
+
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true).
+		Bold(false)
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	t.SetStyles(s)
+
+	return t, nil
 }
 
 func (db OpenDatabase) Init() tea.Cmd {
@@ -122,23 +180,31 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	db.tables, cmd = db.tables.Update(msg)
+
+	switch db.viewMode {
+	case COLUMNS:
+		db.tables, cmd = db.tables.Update(msg)
+	case OPEN:
+		db.selectedTable, cmd = db.selectedTable.Update(msg)
+	}
+
 	return db, cmd
 }
 
 func (db OpenDatabase) View() string {
-	s := fmt.Sprintf("%s\n\n", db.name)
+	s := fmt.Sprintf("%s\n\n", db.params.Name)
 
 	tableLabels := db.tables.View()
 
 	if db.viewMode == COLUMNS {
 		s += lipgloss.JoinHorizontal(lipgloss.Top,
 			focusedModelSideBarStyle.Render(fmt.Sprintf("%4s", tableLabels)),
-			modelStyle.Render("Table"))
+			modelStyle.Render(""))
 	} else {
+		openTable := baseStyle.Render(db.selectedTable.View()) + "\n"
 		s += lipgloss.JoinHorizontal(lipgloss.Top,
 			modelStyle.Render(fmt.Sprintf("%4s", tableLabels)),
-			focusedModelStyle.Render("Table"))
+			focusedModelStyle.Render(openTable))
 	}
 
 	return s

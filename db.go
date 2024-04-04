@@ -100,12 +100,18 @@ func (params Connection) SelectAll(table string) (Table, error) {
 	}
 
 	for rows.Next() {
-		var values []string
-		err = rows.Scan(values)
+		values, err := rows.Values()
 		if err != nil {
 			return Table{}, err
 		}
-		tableData.values = append(tableData.values, values)
+
+		strValues := make([]string, len(values))
+
+		for i, value := range values {
+			strValues[i] = fmt.Sprintf("%v", value)
+		}
+
+		tableData.values = append(tableData.values, strValues)
 	}
 
 	conn.Close(context.Background())
