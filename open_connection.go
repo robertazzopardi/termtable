@@ -196,12 +196,13 @@ func (db OpenDatabase) View() string {
 
 	tableLabels := db.tables.View()
 
+	openTable := baseStyle.Render(db.selectedTable.View()) + "\n"
+
 	if db.viewMode == COLUMNS {
 		s += lipgloss.JoinHorizontal(lipgloss.Top,
 			focusedModelSideBarStyle.Render(fmt.Sprintf("%4s", tableLabels)),
-			modelStyle.Render(""))
+			modelStyle.Render(openTable))
 	} else {
-		openTable := baseStyle.Render(db.selectedTable.View()) + "\n"
 		s += lipgloss.JoinHorizontal(lipgloss.Top,
 			modelStyle.Render(fmt.Sprintf("%4s", tableLabels)),
 			focusedModelStyle.Render(openTable))
