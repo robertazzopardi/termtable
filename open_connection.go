@@ -23,10 +23,6 @@ var (
 				BorderStyle(lipgloss.NormalBorder()).
 				BorderForeground(lipgloss.Color(WHITE))
 
-	modelSideBarStyle = lipgloss.
-				NewStyle().
-				BorderStyle(lipgloss.NormalBorder()).
-				BorderForeground(lipgloss.Color(GREY))
 	focusedModelSideBarStyle = lipgloss.
 					NewStyle().
 					BorderStyle(lipgloss.NormalBorder()).
@@ -40,9 +36,9 @@ var (
 type ViewMode string
 
 const (
-	COLUMNS ViewMode = "COLUMNS"
-	OPEN    ViewMode = "OPEN"
-	QUIT    ViewMode = "QUIT"
+	TABLES ViewMode = "TABLES"
+	OPEN   ViewMode = "OPEN"
+	QUIT   ViewMode = "QUIT"
 )
 
 type tableItem string
@@ -74,6 +70,7 @@ type OpenDatabase struct {
 	tables        list.Model
 	viewMode      ViewMode
 	selectedTable table.Model
+	tableIndex    int
 	params        Connection
 }
 
@@ -86,25 +83,35 @@ func NewOpenDatabase(connParams Connection) OpenDatabase {
 	}
 
 	openDatabase := OpenDatabase{
-		tables:   list.New(listItems, tableItemDelegate{}, 14, 14),
-		viewMode: COLUMNS,
-		params:   connParams,
+		tables:     list.New(listItems, tableItemDelegate{}, 14, 14),
+		viewMode:   TABLES,
+		params:     connParams,
+		tableIndex: 0,
 	}
 
 	openDatabase.tables.SetShowHelp(false)
 	openDatabase.tables.SetShowTitle(false)
 	openDatabase.tables.SetShowStatusBar(false)
 
-	selectedTable, err := openDatabase.openTable(databaseTables[0])
-
-	if err != nil {
-		connParams.status = DISCONNECTED
-		return OpenDatabase{}
-	}
-
-	openDatabase.selectedTable = selectedTable
+	openDatabase.setOpenTable()
 
 	return openDatabase
+}
+
+func (db *OpenDatabase) setOpenTable() {
+	var tableNames []string
+	for _, table := range db.tables.Items() {
+		tableNames = append(tableNames, string(table.(tableItem)))
+	}
+
+	selectedTable, err := db.openTable(tableNames[db.tableIndex])
+
+	if err != nil {
+		db.params.status = DISCONNECTED
+		return
+	}
+
+	db.selectedTable = selectedTable
 }
 
 func (db OpenDatabase) openTable(tableName string) (table.Model, error) {
@@ -122,9 +129,7 @@ func (db OpenDatabase) openTable(tableName string) (table.Model, error) {
 	rows := make([]table.Row, len(tableData.values))
 	for i, value := range tableData.values {
 		rows[i] = make(table.Row, len(value))
-		for j, v := range value {
-			rows[i][j] = v
-		}
+		copy(rows[i], value)
 	}
 
 	t := table.New(
@@ -162,11 +167,24 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 
 		case "left", "right":
 			switch db.viewMode {
-			case COLUMNS:
+			case TABLES:
 				db.viewMode = OPEN
 			case OPEN:
-				db.viewMode = COLUMNS
+				db.viewMode = TABLES
 			}
+
+		case "up", "down":
+			s := msg.String()
+
+			// Cycle indexes
+			if s == "up" {
+				db.tableIndex--
+			} else {
+				db.tableIndex++
+			}
+
+			db.setOpenTable()
+
 		}
 	case tea.WindowSizeMsg:
 		db.tables.SetWidth(msg.Width)
@@ -177,7 +195,7 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch db.viewMode {
-	case COLUMNS:
+	case TABLES:
 		db.tables, cmd = db.tables.Update(msg)
 	case OPEN:
 		db.selectedTable, cmd = db.selectedTable.Update(msg)
@@ -193,7 +211,7 @@ func (db OpenDatabase) View() string {
 
 	openTable := db.selectedTable.View()
 
-	if db.viewMode == COLUMNS {
+	if db.viewMode == TABLES {
 		s += lipgloss.JoinHorizontal(lipgloss.Top,
 			focusedModelSideBarStyle.Render(fmt.Sprintf("%4s", tableLabels)),
 			modelStyle.Render(openTable))
