@@ -27,8 +27,6 @@ const (
 var (
 	focusedButton = focusedStyle.Copy().Render("[ Submit ]")
 	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
-	// errorSubmitButton   = fmt.Sprintf("[ %s ]", errorStyle.Render("Submit"))
-	// successSubmitButton = fmt.Sprintf("[ %s ]", successStyle.Render("Submit"))
 
 	focusedTestButton = focusedStyle.Copy().Render("[ Test ]")
 	blurredTestButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Test"))
