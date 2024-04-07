@@ -35,11 +35,6 @@ var (
 	selectedTableStyle = lipgloss.
 				NewStyle().
 				Foreground(lipgloss.Color(MAGENTA))
-
-	baseStyle = lipgloss.
-			NewStyle().
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Color("240"))
 )
 
 type ViewMode string
@@ -196,7 +191,7 @@ func (db OpenDatabase) View() string {
 
 	tableLabels := db.tables.View()
 
-	openTable := baseStyle.Render(db.selectedTable.View()) + "\n"
+	openTable := db.selectedTable.View()
 
 	if db.viewMode == COLUMNS {
 		s += lipgloss.JoinHorizontal(lipgloss.Top,
