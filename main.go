@@ -51,6 +51,9 @@ var (
 	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(LIGHT_GREY))
 	successStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color(GREEN))
 	errorStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color(RED))
+
+	width  int = 100
+	height int = 100
 )
 
 type item string
@@ -92,6 +95,8 @@ func (m model) updateEvents(msg tea.Msg, cmd tea.Cmd) (model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.list.SetWidth(msg.Width)
+		width = msg.Width
+		height = msg.Height
 		return m, nil
 
 	case tea.KeyMsg:

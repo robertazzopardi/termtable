@@ -109,6 +109,8 @@ func (db *OpenDatabase) setOpenTable() {
 	}
 
 	db.selectedTable = selectedTable
+	db.selectedTable.SetWidth(width / 2)
+	db.selectedTable.SetHeight(height / 2)
 }
 
 func (db OpenDatabase) openTable(tableName string) (table.Model, error) {
@@ -118,9 +120,10 @@ func (db OpenDatabase) openTable(tableName string) (table.Model, error) {
 		return table.Model{}, err
 	}
 
+	max_len := db.selectedTable.Width() / len(tableData.fields)
 	columns := make([]table.Column, len(tableData.fields))
 	for i, field := range tableData.fields {
-		columns[i] = table.Column{Title: field, Width: len(field) + 2}
+		columns[i] = table.Column{Title: field, Width: max_len}
 	}
 
 	rows := make([]table.Row, len(tableData.values))
@@ -133,7 +136,6 @@ func (db OpenDatabase) openTable(tableName string) (table.Model, error) {
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(7),
 	)
 
 	s := table.DefaultStyles()
@@ -170,10 +172,6 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 				db.viewMode = TABLES
 			}
 		}
-	case tea.WindowSizeMsg:
-		db.tables.SetWidth(msg.Width)
-		db.tables.SetHeight(msg.Height)
-		return db, nil
 	}
 
 	var cmd tea.Cmd
