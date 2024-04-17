@@ -84,11 +84,12 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 }
 
 type model struct {
-	list               list.Model
-	newConnectionModel NewConnectionModel
-	currentView        CurrentView
-	currentConnection  Connection
-	openDatabase       OpenDatabase
+	list                list.Model
+	newConnectionModel  NewConnectionModel
+	currentView         CurrentView
+	currentConnection   Connection
+	openDatabase        OpenDatabase
+	existingConnections ExistingConnectionsModel
 }
 
 func (m model) updateEvents(msg tea.Msg, cmd tea.Cmd) (model, tea.Cmd) {
@@ -116,6 +117,7 @@ func (m model) updateEvents(msg tea.Msg, cmd tea.Cmd) (model, tea.Cmd) {
 					m.currentView = EDIT_CONNECTION
 				case "Join Existing":
 					m.currentView = JOIN_EXISTING
+					m.existingConnections = NewExistingConnectionsModel()
 				}
 			}
 			return m, nil
@@ -151,6 +153,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.openDatabase = OpenDatabase{}
 		}
 
+	case JOIN_EXISTING:
+		m.existingConnections, cmd = m.existingConnections.Update(msg)
+
 	case DEFAULT:
 		m, cmd = m.updateEvents(msg, cmd)
 	}
@@ -165,7 +170,7 @@ func (m model) View() string {
 	case EDIT_CONNECTION:
 		return quitTextStyle.Render("Edit Connection")
 	case JOIN_EXISTING:
-		return quitTextStyle.Render("Join Existing")
+		return quitTextStyle.Render(m.existingConnections.View())
 	case DATABASE_VIEW:
 		return quitTextStyle.Render(m.openDatabase.View())
 	default:

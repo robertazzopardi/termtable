@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/zalando/go-keyring"
@@ -18,29 +19,7 @@ const (
 	LOCAL_BUCKET_NAME = "database_connections"
 )
 
-func updateLocalDbConn(name string, host string, port string) error {
-	homeDir, err := os.UserHomeDir()
-
-	if err != nil {
-		return errors.New("Could not get home directory")
-	}
-
-	localDb := fmt.Sprintf("%s/.termtable/connections.db", homeDir)
-
-	db, err := bolt.Open(localDb, 0600, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	return db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
-		err := b.Put([]byte(host), []byte(fmt.Sprintf("%s:%s", host, port)))
-		return err
-	})
-}
-
-func getLocalDbConn(name string) (string, error) {
+func getAndOrCreateLocalDb() (string, error) {
 	homeDir, err := os.UserHomeDir()
 
 	if err != nil {
@@ -49,11 +28,75 @@ func getLocalDbConn(name string) (string, error) {
 
 	localDb := fmt.Sprintf("%s/.termtable/connections.db", homeDir)
 
+	if _, err := os.Stat(localDb); os.IsNotExist(err) {
+		err := os.Mkdir(filepath.Dir(localDb), 0755)
+		if err != nil {
+			log.Fatal("Could not create directory to store local db: ", err)
+			os.Exit(0)
+		}
+	}
+
+	return localDb, nil
+}
+
+func createBucket(db *bolt.DB) error {
+	// Start a writable transaction.
+	tx, err := db.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Use the transaction...
+	_, err = tx.CreateBucket([]byte(LOCAL_BUCKET_NAME))
+	if err != nil {
+		return err
+	}
+
+	// Commit the transaction and check for error.
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func updateLocalDbConn(name string, host string, port string) error {
+	localDb, err := getAndOrCreateLocalDb()
+
+	if err != nil {
+		return err
+	}
+
 	db, err := bolt.Open(localDb, 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	createBucket(db)
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
+		err := b.Put([]byte(name), []byte(fmt.Sprintf("%s:%s", host, port)))
+		return err
+	})
+
+	return err
+}
+
+func getLocalDbConn(name string) (string, error) {
+	localDb, err := getAndOrCreateLocalDb()
+
+	if err != nil {
+		return "", err
+	}
+
+	db, err := bolt.Open(localDb, 0600, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+	createBucket(db)
 
 	var value string
 	err = db.View(func(tx *bolt.Tx) error {
@@ -67,19 +110,18 @@ func getLocalDbConn(name string) (string, error) {
 }
 
 func deleteLocalDbConn(name string) error {
-	homeDir, err := os.UserHomeDir()
+	localDb, err := getAndOrCreateLocalDb()
 
 	if err != nil {
-		return errors.New("Could not get home directory")
+		return err
 	}
-
-	localDb := fmt.Sprintf("%s/.termtable/connections.db", homeDir)
 
 	db, err := bolt.Open(localDb, 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	createBucket(db)
 
 	db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
@@ -91,25 +133,23 @@ func deleteLocalDbConn(name string) error {
 }
 
 func listLocalDbConn() (map[string]string, error) {
-	homeDir, err := os.UserHomeDir()
+	localDb, err := getAndOrCreateLocalDb()
 
 	if err != nil {
-		return make(map[string]string), errors.New("Could not get home directory")
+		return make(map[string]string), err
 	}
-
-	localDb := fmt.Sprintf("%s/.termtable/connections.db", homeDir)
 
 	db, err := bolt.Open(localDb, 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	createBucket(db)
 
 	connections := make(map[string]string)
 
 	err = db.View(func(tx *bolt.Tx) error {
-		// Assume bucket exists and has keys
-		b := tx.Bucket([]byte("MyBucket"))
+		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
 
 		c := b.Cursor()
 
@@ -149,4 +189,30 @@ func SaveConnectionInKeyring(conn Connection) error {
 	}
 
 	return nil
+}
+
+func ListConnections() ([]Connection, error) {
+	connections, err := listLocalDbConn()
+
+	var conns []Connection
+
+	if err != nil {
+		return conns, errors.New("Could not list connections")
+	}
+
+	for k, v := range connections {
+		hostPort := strings.Split(v, ":")
+		if len(hostPort) != 2 {
+			log.Fatal(fmt.Sprintf("Connection %s does not have the correct host and port value", k))
+			continue
+		}
+		conn := Connection{
+			Name: k,
+			Host: hostPort[0],
+			Port: hostPort[1],
+		}
+		conns = append(conns, conn)
+	}
+
+	return conns, nil
 }
