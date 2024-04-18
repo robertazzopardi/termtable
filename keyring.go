@@ -14,7 +14,6 @@ import (
 
 const (
 	SERVICE = "termtable-app"
-	USER    = "termtable-user-anon"
 
 	LOCAL_BUCKET_NAME = "database_connections"
 )
@@ -174,21 +173,37 @@ func parseKeyringPassword(password string) (string, string, error) {
 	passwordComponents := strings.Split(password, ":")
 
 	if len(passwordComponents) != 2 {
-		return "", "", errors.New("Expected saved password to contain 2 components")
+		log.Fatal("Expected saved password to contain 2 components")
 	}
 
 	return passwordComponents[0], passwordComponents[1], nil
 }
 
-func SaveConnectionInKeyring(conn Connection) error {
+func SaveConnectionInKeyring(conn Connection) {
+	// Save keyring part
 	password := createKeyringPassword(conn.User, conn.Pass)
-	err := keyring.Set(SERVICE, USER, password)
+	err := keyring.Set(SERVICE, conn.Name, password)
 
 	if err != nil {
-		return err
+		log.Fatal("Could not save db credentials in keyring: ", err)
 	}
 
-	return nil
+	// Save rest to local storage
+	err = updateLocalDbConn(conn.Name, conn.Host, conn.Port)
+
+	if err != nil {
+		log.Fatal("Could not set keyring info into local db: ", err)
+	}
+}
+
+func GetConnectionFromKeyring(name string) (string, string, error) {
+	password, err := keyring.Get(SERVICE, name)
+
+	if err != nil {
+		log.Fatal("Could not get credentials for connection: ", err)
+	}
+
+	return parseKeyringPassword(password)
 }
 
 func ListConnections() ([]Connection, error) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -9,9 +10,9 @@ import (
 )
 
 type ExistingConnectionsModel struct {
-	list        list.Model
-	connections []Connection
-	choice      string
+	list               list.Model
+	connections        []Connection
+	selectedConnection *Connection
 }
 
 func NewExistingConnectionsModel() ExistingConnectionsModel {
@@ -58,14 +59,32 @@ func (m ExistingConnectionsModel) Update(msg tea.Msg) (ExistingConnectionsModel,
 	case tea.KeyMsg:
 		switch keypress := msg.String(); keypress {
 		case "q", "ctrl+c":
+			fmt.Println("Quitting")
 			os.Exit(0)
 
 		case "enter":
 			i, ok := m.list.SelectedItem().(item)
 			if ok {
-				m.choice = string(i)
+				choice := string(i)
+
+				for _, v := range m.connections {
+					if v.Name == choice {
+						m.selectedConnection = &v
+
+						user, pass, err := GetConnectionFromKeyring(v.Name)
+
+						if err != nil {
+							log.Fatal("Could not get user and password for connection from keyring: ", err)
+						}
+
+						m.selectedConnection.User = user
+						m.selectedConnection.Pass = pass
+
+						break
+					}
+				}
 			}
-			return m, tea.Quit
+			return m, nil
 		}
 	}
 
@@ -75,9 +94,5 @@ func (m ExistingConnectionsModel) Update(msg tea.Msg) (ExistingConnectionsModel,
 }
 
 func (m ExistingConnectionsModel) View() string {
-	if m.choice != "" {
-		return quitTextStyle.Render(fmt.Sprintf("%s? Sounds good to me.", m.choice))
-	}
-
-	return "\n" + m.list.View()
+	return m.list.View()
 }

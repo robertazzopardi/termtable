@@ -141,9 +141,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.newConnectionModel.connection.status == CONNECTED {
 			m.currentView = DATABASE_VIEW
 			m.currentConnection = m.newConnectionModel.connection
+			m.openDatabase = NewOpenDatabase(m.currentConnection)
 
-			openDatabase := NewOpenDatabase(m.currentConnection)
-			m.openDatabase = openDatabase
+			SaveConnectionInKeyring(m.currentConnection)
 		}
 
 	case DATABASE_VIEW:
@@ -155,6 +155,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case JOIN_EXISTING:
 		m.existingConnections, cmd = m.existingConnections.Update(msg)
+		fmt.Println(cmd)
+		if m.existingConnections.selectedConnection != nil {
+			m.currentView = DATABASE_VIEW
+			m.currentConnection = *m.existingConnections.selectedConnection
+			m.openDatabase = NewOpenDatabase(m.currentConnection)
+
+			fmt.Printf("%s\n", m.currentConnection)
+		}
 
 	case DEFAULT:
 		m, cmd = m.updateEvents(msg, cmd)
