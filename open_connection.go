@@ -188,7 +188,7 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 }
 
 func (db OpenDatabase) View() string {
-	s := fmt.Sprintf("%s\n\n", db.params.Name)
+	s := fmt.Sprintf("%s / %s\n\n", db.params.Name, db.params.Database)
 
 	tableLabels := db.tables.View()
 

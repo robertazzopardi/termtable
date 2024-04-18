@@ -1,9 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,11 +11,10 @@ type ExistingConnectionsModel struct {
 	list               list.Model
 	connections        []Connection
 	selectedConnection *Connection
+	back               bool
 }
 
 func NewExistingConnectionsModel() ExistingConnectionsModel {
-	const defaultWidth = 20
-
 	existingConnectionsModel := ExistingConnectionsModel{}
 
 	connections, err := ListConnections()
@@ -59,8 +56,8 @@ func (m ExistingConnectionsModel) Update(msg tea.Msg) (ExistingConnectionsModel,
 	case tea.KeyMsg:
 		switch keypress := msg.String(); keypress {
 		case "q", "ctrl+c":
-			fmt.Println("Quitting")
-			os.Exit(0)
+			m.back = true
+			return m, nil
 
 		case "enter":
 			i, ok := m.list.SelectedItem().(item)

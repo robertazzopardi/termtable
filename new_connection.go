@@ -49,6 +49,7 @@ func InitialNewConnectionModel() NewConnectionModel {
 		"Port",
 		"User",
 		"Pass",
+		"Database",
 		"Name",
 	}
 	m := NewConnectionModel{
@@ -121,12 +122,13 @@ func (m NewConnectionModel) Update(msg tea.Msg) (NewConnectionModel, tea.Cmd) {
 		case "enter":
 			if m.focusIndex == len(m.inputs) {
 				conn := Connection{
-					Host:   m.inputs[0].Value(),
-					Port:   m.inputs[1].Value(),
-					User:   m.inputs[2].Value(),
-					Pass:   m.inputs[3].Value(),
-					Name:   m.inputs[4].Value(),
-					status: DISCONNECTED,
+					Host:     m.inputs[0].Value(),
+					Port:     m.inputs[1].Value(),
+					User:     m.inputs[2].Value(),
+					Pass:     m.inputs[3].Value(),
+					Database: m.inputs[4].Value(),
+					Name:     m.inputs[5].Value(),
+					status:   DISCONNECTED,
 				}
 
 				switch m.action {

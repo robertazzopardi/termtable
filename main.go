@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
-	"os"
+	"log"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -21,7 +21,10 @@ const (
 	DATABASE_VIEW   CurrentView = "DATABASE_VIEW"
 )
 
-const listHeight = 14
+const (
+	defaultWidth = 20
+	listHeight   = 14
+)
 
 // Primary ansi colours
 const (
@@ -155,13 +158,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case JOIN_EXISTING:
 		m.existingConnections, cmd = m.existingConnections.Update(msg)
-		fmt.Println(cmd)
 		if m.existingConnections.selectedConnection != nil {
 			m.currentView = DATABASE_VIEW
 			m.currentConnection = *m.existingConnections.selectedConnection
 			m.openDatabase = NewOpenDatabase(m.currentConnection)
+		}
 
-			fmt.Printf("%s\n", m.currentConnection)
+		if m.existingConnections.back {
+			m.currentView = DEFAULT
 		}
 
 	case DEFAULT:
@@ -193,8 +197,6 @@ func main() {
 		item("Join Existing"),
 	}
 
-	const defaultWidth = 20
-
 	l := list.New(items, itemDelegate{}, defaultWidth, listHeight)
 	l.Title = "Welcome to TermTable"
 	l.SetShowStatusBar(false)
@@ -206,7 +208,6 @@ func main() {
 	m := model{list: l, currentView: DEFAULT}
 
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
-		fmt.Println("Error running program:", err)
-		os.Exit(1)
+		log.Fatal("Error running program:", err)
 	}
 }

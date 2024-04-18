@@ -31,7 +31,6 @@ func getAndOrCreateLocalDb() (string, error) {
 		err := os.Mkdir(filepath.Dir(localDb), 0755)
 		if err != nil {
 			log.Fatal("Could not create directory to store local db: ", err)
-			os.Exit(0)
 		}
 	}
 
@@ -60,7 +59,7 @@ func createBucket(db *bolt.DB) error {
 	return nil
 }
 
-func updateLocalDbConn(name string, host string, port string) error {
+func updateLocalDbConn(conn Connection) error {
 	localDb, err := getAndOrCreateLocalDb()
 
 	if err != nil {
@@ -76,7 +75,7 @@ func updateLocalDbConn(name string, host string, port string) error {
 
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
-		err := b.Put([]byte(name), []byte(fmt.Sprintf("%s:%s", host, port)))
+		err := b.Put([]byte(conn.Name), []byte(fmt.Sprintf("%s:%s:%s", conn.Host, conn.Port, conn.Database)))
 		return err
 	})
 
@@ -134,8 +133,10 @@ func deleteLocalDbConn(name string) error {
 func listLocalDbConn() (map[string]string, error) {
 	localDb, err := getAndOrCreateLocalDb()
 
+	connections := make(map[string]string)
+
 	if err != nil {
-		return make(map[string]string), err
+		return connections, err
 	}
 
 	db, err := bolt.Open(localDb, 0600, nil)
@@ -145,15 +146,12 @@ func listLocalDbConn() (map[string]string, error) {
 	defer db.Close()
 	createBucket(db)
 
-	connections := make(map[string]string)
-
 	err = db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
 
 		c := b.Cursor()
 
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			fmt.Printf("key=%s, value=%s\n", k, v)
 			key := fmt.Sprintf("%s", k)
 			value := fmt.Sprintf("%s", v)
 			connections[key] = value
@@ -189,7 +187,7 @@ func SaveConnectionInKeyring(conn Connection) {
 	}
 
 	// Save rest to local storage
-	err = updateLocalDbConn(conn.Name, conn.Host, conn.Port)
+	err = updateLocalDbConn(conn)
 
 	if err != nil {
 		log.Fatal("Could not set keyring info into local db: ", err)
@@ -216,15 +214,16 @@ func ListConnections() ([]Connection, error) {
 	}
 
 	for k, v := range connections {
-		hostPort := strings.Split(v, ":")
-		if len(hostPort) != 2 {
-			log.Fatal(fmt.Sprintf("Connection %s does not have the correct host and port value", k))
+		hostPortDb := strings.Split(v, ":")
+		if len(hostPortDb) != 3 {
+			log.Fatal(fmt.Sprintf("Connection %s does not have the correct host, port and db value", k))
 			continue
 		}
 		conn := Connection{
-			Name: k,
-			Host: hostPort[0],
-			Port: hostPort[1],
+			Name:     k,
+			Host:     hostPortDb[0],
+			Port:     hostPortDb[1],
+			Database: hostPortDb[2],
 		}
 		conns = append(conns, conn)
 	}
