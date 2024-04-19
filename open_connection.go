@@ -117,7 +117,7 @@ func (db OpenDatabase) openTable(tableName string) (table.Model, error) {
 	tableData, err := db.params.SelectAll(tableName)
 
 	if err != nil {
-		return table.Model{}, err
+		return db.selectedTable, err
 	}
 
 	max_len := db.selectedTable.Width() / len(tableData.fields)
@@ -205,5 +205,5 @@ func (db OpenDatabase) View() string {
 			focusedModelStyle.Render(openTable))
 	}
 
-	return s
+	return paginationStyle.Render(s)
 }

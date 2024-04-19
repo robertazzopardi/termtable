@@ -43,7 +43,7 @@ var (
 	itemStyle       = lipgloss.NewStyle().PaddingLeft(4)
 	paginationStyle = list.DefaultStyles().PaginationStyle.PaddingLeft(4)
 	quitTextStyle   = lipgloss.NewStyle().Margin(1, 0, 2, 0)
-	helpStyle       = blurredStyle.Copy()
+	helpStyle       = blurredStyle.Copy().PaddingLeft(2)
 	cursorStyle     = focusedItemStyle.Copy()
 	noStyle         = lipgloss.NewStyle()
 
@@ -172,7 +172,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.currentView = DEFAULT
 		}
 
-	case DEFAULT:
+	case DEFAULT, EDIT_CONNECTION:
 		m, cmd = m.updateEvents(msg, cmd)
 	}
 

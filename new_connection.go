@@ -238,9 +238,5 @@ func (m NewConnectionModel) View() string {
 	}
 	fmt.Fprintf(&b, "\n\n%s%s\n\n", *submitButton, *testButton)
 
-	b.WriteString(helpStyle.Render("cursor mode is "))
-	b.WriteString(cursorModeHelpStyle.Render(m.cursorMode.String()))
-	b.WriteString(helpStyle.Render(" (ctrl+r to change style)"))
-
 	return paginationStyle.Render(b.String())
 }
