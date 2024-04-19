@@ -14,6 +14,7 @@ type Action string
 const (
 	SUBMIT Action = "SUBMIT"
 	TEST   Action = "TEST"
+	CANCEL Action = "CANCEL"
 )
 
 type TestStatus string
@@ -91,7 +92,8 @@ func (m NewConnectionModel) Update(msg tea.Msg) (NewConnectionModel, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
-			return m, tea.Quit
+			m.action = CANCEL
+			return m, nil
 
 		// Change cursor mode
 		case "ctrl+r":
@@ -208,6 +210,8 @@ func (m *NewConnectionModel) updateInputs(msg tea.Msg) tea.Cmd {
 func (m NewConnectionModel) View() string {
 	var b strings.Builder
 
+	b.WriteString("New Connection\n\n")
+
 	for i := range m.inputs {
 		b.WriteString(m.inputs[i].View())
 		if i < len(m.inputs)-1 {
@@ -238,5 +242,5 @@ func (m NewConnectionModel) View() string {
 	b.WriteString(cursorModeHelpStyle.Render(m.cursorMode.String()))
 	b.WriteString(helpStyle.Render(" (ctrl+r to change style)"))
 
-	return b.String()
+	return paginationStyle.Render(b.String())
 }

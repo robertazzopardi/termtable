@@ -39,10 +39,10 @@ const (
 )
 
 var (
-	titleStyle      = lipgloss.NewStyle().MarginLeft(2)
+	titleStyle      = lipgloss.NewStyle()
 	itemStyle       = lipgloss.NewStyle().PaddingLeft(4)
 	paginationStyle = list.DefaultStyles().PaginationStyle.PaddingLeft(4)
-	quitTextStyle   = lipgloss.NewStyle().Margin(1, 0, 2, 4)
+	quitTextStyle   = lipgloss.NewStyle().Margin(1, 0, 2, 0)
 	helpStyle       = blurredStyle.Copy()
 	cursorStyle     = focusedItemStyle.Copy()
 	noStyle         = lipgloss.NewStyle()
@@ -147,6 +147,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.openDatabase = NewOpenDatabase(m.currentConnection)
 
 			SaveConnectionInKeyring(m.currentConnection)
+		}
+
+		if m.newConnectionModel.action == CANCEL {
+			m.currentView = DEFAULT
 		}
 
 	case DATABASE_VIEW:
