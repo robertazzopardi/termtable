@@ -180,7 +180,6 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 	switch db.viewMode {
 	case TABLES:
 		db.tables, cmd = db.tables.Update(msg)
-		db.setOpenTable()
 	case OPEN:
 		db.selectedTable, cmd = db.selectedTable.Update(msg)
 	}
@@ -193,6 +192,7 @@ func (db OpenDatabase) View() string {
 
 	tableLabels := db.tables.View()
 
+	db.setOpenTable()
 	openTable := db.selectedTable.View()
 
 	if db.viewMode == TABLES {
