@@ -161,8 +161,9 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q":
+		case "q", "ctrl+c":
 			db.viewMode = QUIT
+			return db, nil
 
 		case "left", "right":
 			switch db.viewMode {
