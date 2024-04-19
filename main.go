@@ -47,13 +47,12 @@ var (
 	cursorStyle     = focusedItemStyle.Copy()
 	noStyle         = lipgloss.NewStyle()
 
-	selectedItemStyle   = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color(MAGENTA))
-	focusedItemStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color(RED))
-	focusedStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color(WHITE))
-	blurredStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color(GREY))
-	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(LIGHT_GREY))
-	successStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color(GREEN))
-	errorStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color(RED))
+	selectedItemStyle = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color(MAGENTA))
+	focusedItemStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(RED))
+	focusedStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(WHITE))
+	blurredStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(GREY))
+	successStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(GREEN))
+	errorStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color(RED))
 
 	width  int = 100
 	height int = 100
@@ -95,7 +94,7 @@ type model struct {
 	existingConnections ExistingConnectionsModel
 }
 
-func (m model) updateEvents(msg tea.Msg, cmd tea.Cmd) (model, tea.Cmd) {
+func (m model) updateEvents(msg tea.Msg) (model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.list.SetWidth(msg.Width)
@@ -127,6 +126,7 @@ func (m model) updateEvents(msg tea.Msg, cmd tea.Cmd) (model, tea.Cmd) {
 		}
 	}
 
+	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
 	return m, cmd
 }
@@ -173,7 +173,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case DEFAULT, EDIT_CONNECTION:
-		m, cmd = m.updateEvents(msg, cmd)
+		m, cmd = m.updateEvents(msg)
 	}
 
 	return m, cmd

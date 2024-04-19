@@ -43,7 +43,9 @@ func createBucket(db *bolt.DB) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		err = tx.Rollback()
+	}()
 
 	// Use the transaction...
 	_, err = tx.CreateBucket([]byte(LOCAL_BUCKET_NAME))
@@ -56,7 +58,7 @@ func createBucket(db *bolt.DB) error {
 		return err
 	}
 
-	return nil
+	return err
 }
 
 func updateLocalDbConn(conn Connection) error {
@@ -71,7 +73,11 @@ func updateLocalDbConn(conn Connection) error {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	createBucket(db)
+
+	err = createBucket(db)
+	if err != nil {
+		return err
+	}
 
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
@@ -80,31 +86,6 @@ func updateLocalDbConn(conn Connection) error {
 	})
 
 	return err
-}
-
-func getLocalDbConn(name string) (string, error) {
-	localDb, err := getAndOrCreateLocalDb()
-
-	if err != nil {
-		return "", err
-	}
-
-	db, err := bolt.Open(localDb, 0600, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-	createBucket(db)
-
-	var value string
-	err = db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
-		v := b.Get([]byte(name))
-		value = fmt.Sprintf("%s", v)
-		return nil
-	})
-
-	return value, err
 }
 
 func deleteLocalDbConn(name string) error {
@@ -119,15 +100,19 @@ func deleteLocalDbConn(name string) error {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	createBucket(db)
 
-	db.Update(func(tx *bolt.Tx) error {
+	err = createBucket(db)
+	if err != nil {
+		return err
+	}
+
+	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
 		err := b.Delete([]byte(name))
 		return err
 	})
 
-	return nil
+	return err
 }
 
 func listLocalDbConn() (map[string]string, error) {
@@ -144,7 +129,11 @@ func listLocalDbConn() (map[string]string, error) {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	createBucket(db)
+
+	err = createBucket(db)
+	if err != nil {
+		return connections, err
+	}
 
 	err = db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
@@ -152,8 +141,8 @@ func listLocalDbConn() (map[string]string, error) {
 		c := b.Cursor()
 
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			key := fmt.Sprintf("%s", k)
-			value := fmt.Sprintf("%s", v)
+			key := string(k)
+			value := string(v)
 			connections[key] = value
 		}
 
@@ -216,7 +205,6 @@ func ListConnections() ([]Connection, error) {
 	for k, v := range connections {
 		hostPortDb := strings.Split(v, ":")
 		if len(hostPortDb) != 3 {
-			log.Fatal(fmt.Sprintf("Connection %s does not have the correct host, port and db value", k))
 			continue
 		}
 		conn := Connection{
