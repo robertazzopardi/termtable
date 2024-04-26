@@ -48,7 +48,7 @@ func createBucket(db *bolt.DB) error {
 	}()
 
 	// Use the transaction...
-	_, err = tx.CreateBucket([]byte(LOCAL_BUCKET_NAME))
+	_, err = tx.CreateBucketIfNotExists([]byte(LOCAL_BUCKET_NAME))
 	if err != nil {
 		return err
 	}
