@@ -49,10 +49,6 @@ func (m ExistingConnectionsModel) Init() tea.Cmd {
 
 func (m ExistingConnectionsModel) Update(msg tea.Msg) (ExistingConnectionsModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.list.SetWidth(msg.Width)
-		return m, nil
-
 	case tea.KeyMsg:
 		switch keypress := msg.String(); keypress {
 		case "q", "ctrl+c":

@@ -7,19 +7,20 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	ltb "github.com/charmbracelet/lipgloss/table"
 )
 
 var (
+	unFocusedBorderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(GREY))
+	focusedBorderStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(WHITE))
+
 	modelStyle = lipgloss.
 			NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color(GREY))
-	focusedModelStyle = lipgloss.
-				NewStyle().
-				BorderStyle(lipgloss.NormalBorder()).
-				BorderForeground(lipgloss.Color(WHITE))
 
 	focusedModelSideBarStyle = lipgloss.
 					NewStyle().
@@ -70,11 +71,12 @@ func (d tableItemDelegate) Render(w io.Writer, m list.Model, index int, listItem
 type OpenDatabase struct {
 	tables        list.Model
 	viewMode      ViewMode
-	selectedTable table.Model
+	selectedTable *ltb.Table
 	params        Connection
+	viewport      *viewport.Model
 }
 
-func NewOpenDatabase(connParams Connection) OpenDatabase {
+func NewOpenDatabase(connParams Connection, viewport *viewport.Model) OpenDatabase {
 	databaseTables := connParams.GetTableNames()
 
 	listItems := []list.Item{}
@@ -86,6 +88,7 @@ func NewOpenDatabase(connParams Connection) OpenDatabase {
 		tables:   list.New(listItems, tableItemDelegate{}, 14, 14),
 		viewMode: TABLES,
 		params:   connParams,
+		viewport: viewport,
 	}
 
 	openDatabase.tables.SetShowHelp(false)
@@ -109,46 +112,49 @@ func (db *OpenDatabase) setOpenTable() {
 	}
 
 	db.selectedTable = selectedTable
-	db.selectedTable.SetWidth(width / 2)
-	db.selectedTable.SetHeight(height / 2)
+	// db.selectedTable.SetWidth(db.viewport.Width / 2)
+	// db.selectedTable.SetHeight(db.viewport.Height / 2)
 }
 
-func (db OpenDatabase) openTable(tableName string) (table.Model, error) {
+func (db OpenDatabase) openTable(tableName string) (*ltb.Table, error) {
 	tableData, err := db.params.SelectAll(tableName)
 
 	if err != nil {
 		return db.selectedTable, err
 	}
 
-	max_len := db.selectedTable.Width() / len(tableData.fields)
-	columns := make([]table.Column, len(tableData.fields))
+	// max_len := db.selectedTable.Width() / len(tableData.fields)
+	// columns := make([]table.Column, len(tableData.fields))
+	cols := make([]string, len(tableData.fields))
 	for i, field := range tableData.fields {
-		columns[i] = table.Column{Title: field, Width: max_len}
+		// columns[i] = table.Column{Title: field, Width: max_len}
+		cols[i] = field
 	}
 
 	rows := make([]table.Row, len(tableData.values))
+	rowss := make([][]string, len(tableData.values))
 	for i, value := range tableData.values {
 		rows[i] = make(table.Row, len(value))
 		copy(rows[i], value)
+		rowss[i] = make([]string, len(value))
+		copy(rowss[i], value)
 	}
 
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithFocused(true),
-	)
+	t := ltb.New().
+		Headers(cols...).
+		Rows(rowss...)
 
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(false)
-	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	t.SetStyles(s)
+	// s := table.DefaultStyles()
+	// s.Header = s.Header.
+	// 	BorderStyle(lipgloss.NormalBorder()).
+	// 	BorderForeground(lipgloss.Color("240")).
+	// 	BorderBottom(true).
+	// 	Bold(false)
+	// s.Selected = s.Selected.
+	// 	Foreground(lipgloss.Color("229")).
+	// 	Background(lipgloss.Color("57")).
+	// 	Bold(false)
+	// t.SetStyles(s)
 
 	return t, nil
 }
@@ -181,7 +187,7 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 	case TABLES:
 		db.tables, cmd = db.tables.Update(msg)
 	case OPEN:
-		db.selectedTable, cmd = db.selectedTable.Update(msg)
+		// db.selectedTable, cmd = db.selectedTable.Update(msg)
 	}
 
 	return db, cmd
@@ -193,16 +199,16 @@ func (db OpenDatabase) View() string {
 	tableLabels := db.tables.View()
 
 	db.setOpenTable()
-	openTable := db.selectedTable.View()
+	openTable := db.selectedTable //.View()
 
 	if db.viewMode == TABLES {
 		s += lipgloss.JoinHorizontal(lipgloss.Top,
 			focusedModelSideBarStyle.Render(tableLabels),
-			modelStyle.Render(openTable))
+			openTable.BorderStyle(unFocusedBorderStyle).String())
 	} else {
 		s += lipgloss.JoinHorizontal(lipgloss.Top,
 			modelStyle.Render(tableLabels),
-			focusedModelStyle.Render(openTable))
+			openTable.BorderStyle(focusedBorderStyle).String())
 	}
 
 	return paginationStyle.Render(s)

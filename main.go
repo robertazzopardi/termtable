@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -53,9 +54,6 @@ var (
 	blurredStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(GREY))
 	successStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(GREEN))
 	errorStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color(RED))
-
-	width  int = 100
-	height int = 100
 )
 
 type item string
@@ -92,14 +90,14 @@ type model struct {
 	currentConnection   Connection
 	openDatabase        OpenDatabase
 	existingConnections ExistingConnectionsModel
+	viewport            viewport.Model
 }
 
 func (m model) updateEvents(msg tea.Msg) (model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.list.SetWidth(msg.Width)
-		width = msg.Width
-		height = msg.Height
+		m.viewport.Width = msg.Width
+		m.viewport.Height = msg.Height
 		return m, nil
 
 	case tea.KeyMsg:
@@ -144,7 +142,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.newConnectionModel.connection.status == CONNECTED {
 			m.currentView = DATABASE_VIEW
 			m.currentConnection = m.newConnectionModel.connection
-			m.openDatabase = NewOpenDatabase(m.currentConnection)
+			m.openDatabase = NewOpenDatabase(m.currentConnection, &m.viewport)
 
 			SaveConnectionInKeyring(m.currentConnection)
 		}
@@ -165,7 +163,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.existingConnections.selectedConnection != nil {
 			m.currentView = DATABASE_VIEW
 			m.currentConnection = *m.existingConnections.selectedConnection
-			m.openDatabase = NewOpenDatabase(m.currentConnection)
+			m.openDatabase = NewOpenDatabase(m.currentConnection, &m.viewport)
 		}
 
 		if m.existingConnections.back {
