@@ -3,15 +3,29 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
+
+	// "log"
 	"strings"
+
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	// "github.com/gdamore/tcell/v2"
 )
 
 type CurrentView string
+
+const TERMTABLE_TEXT = `
+  __                        __        ___.   .__          
+_/  |_  ___________  ______/  |______ \_ |__ |  |   ____  
+\   __\/ __ \_  __ \/     \   __\__  \ | __ \|  | _/ __ \ 
+ |  | \  ___/|  | \/  Y Y  \  |  / __ \| \_\ \  |_\  ___/ 
+ |__|  \___  >__|  |__|_|  /__| (____  /___  /____/\___  >
+           \/            \/          \/    \/          \/ 
+`
 
 const (
 	DEFAULT         CurrentView = "DEFAULT"
@@ -194,24 +208,115 @@ func (m model) View() string {
 	}
 }
 
+func hotkeys(app *tview.Application) *tview.List {
+	// hotkeyTable := tview.NewTable()
+
+	// lorem := strings.Split("Lorem ipsum dolor", " ")
+	// // cols, rows := 5, 2
+	// // word := 0
+	// // for r := 0; r < rows; r++ {
+	// // 	for c := 0; c < cols; c++ {
+	// // 		color := tcell.ColorWhite
+	// // 		if c < 1 || r < 1 {
+	// // 			color = tcell.ColorYellow
+	// // 		}
+	// // 		word = (word + 1) % len(lorem)
+	// // 	}
+	// // }
+
+	list := tview.NewList().ShowSecondaryText(false).
+		SetSelectedFocusOnly(true).
+		SetShortcutStyle(tcell.StyleDefault)
+
+	list.
+		AddItem("List item 1", "", 0, nil).
+		AddItem("List item 2", "", 0, nil).
+		AddItem("List item 3", "", 0, nil).
+		AddItem("List item 4", "", 0, nil).
+		AddItem("<q> quit", "", 0, func() {
+			app.Stop()
+		})
+
+	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Rune() {
+		case 'a':
+			list.SetCurrentItem(0)
+			app.Stop()
+			return nil
+		case 'b':
+			list.SetCurrentItem(1)
+			app.Stop()
+			return nil
+		}
+		return event
+	})
+
+	// 		hotkeyTable.SetCell(0, 0,
+	// 			tview.NewTableCell(lorem[word]).
+	// 				SetTextColor(color).
+	// 				SetAlign(tview.AlignCenter))
+
+	return list
+}
+
+func currentConnectionInfo() *tview.List {
+	list := tview.NewList().ShowSecondaryText(false).
+		SetSelectedFocusOnly(true).
+		AddItem(" Name: ", "", 0, nil).
+		AddItem(" Database: ", "", 0, nil).
+		AddItem(" Host: ", "", 0, nil).
+		AddItem(" PORT: ", "", 0, nil).
+		AddItem(" USER: ", "Press to exit", 0, nil)
+
+	return list
+}
+
+func header(app *tview.Application) *tview.Flex {
+	connection := currentConnectionInfo()
+
+	table := hotkeys(app)
+
+	headerView := tview.NewFlex().
+		AddItem(connection, 0, 1, false).
+		AddItem(table, 0, 2, false)
+		// AddItem(tview.NewBox(), 0, 2, false).
+		// AddItem(tview.NewBox(), 0, 3, false)
+	return headerView
+}
+
+func mainView(app *tview.Application) *tview.Flex {
+	flex := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(header(app), 0, 1, false).
+		AddItem(tview.NewBox().SetBorder(true).SetTitle("Connections"), 0, 6, false)
+
+	return flex
+}
+
 func main() {
-	items := []list.Item{
-		item("New Connection"),
-		item("Edit Connection"),
-		item("Join Existing"),
+	app := tview.NewApplication()
+	mainView := mainView(app)
+
+	if err := app.SetRoot(mainView, true).SetFocus(mainView).Run(); err != nil {
+		panic(err)
 	}
 
-	l := list.New(items, itemDelegate{}, defaultWidth, listHeight)
-	l.Title = "Welcome to TermTable"
-	l.SetShowStatusBar(false)
-	l.SetFilteringEnabled(false)
-	l.Styles.Title = titleStyle
-	l.Styles.PaginationStyle = paginationStyle
-	l.Styles.HelpStyle = helpStyle
+	// items := []list.Item{
+	// 	item("New Connection"),
+	// 	item("Edit Connection"),
+	// 	item("Join Existing"),
+	// }
 
-	m := model{list: l, currentView: DEFAULT}
+	// l := list.New(items, itemDelegate{}, defaultWidth, listHeight)
+	// l.Title = "Welcome to TermTable"
+	// l.SetShowStatusBar(false)
+	// l.SetFilteringEnabled(false)
+	// l.Styles.Title = titleStyle
+	// l.Styles.PaginationStyle = paginationStyle
+	// l.Styles.HelpStyle = helpStyle
 
-	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
-		log.Fatal("Error running program:", err)
-	}
+	// m := model{list: l, currentView: DEFAULT}
+
+	// if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
+	// 	log.Fatal("Error running program:", err)
+	// }
 }

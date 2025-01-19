@@ -1,5 +1,8 @@
+version: "3" 
+name: termtable
+
 services:
-  pgdb:
+  pg:
     image: postgres:latest
     restart: always
     environment:
@@ -10,7 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - termtabledata:/var/lib/postgresql/data
-      - ./data/postgres:/docker-entrypoint-initdb.d
+      - ./postgres:/docker-entrypoint-initdb.d
 
 volumes:
   termtabledata:
