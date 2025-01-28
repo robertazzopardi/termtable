@@ -18,13 +18,21 @@ import (
 
 type CurrentView string
 
-const TERMTABLE_TEXT = `
-  __                        __        ___.   .__          
-_/  |_  ___________  ______/  |______ \_ |__ |  |   ____  
-\   __\/ __ \_  __ \/     \   __\__  \ | __ \|  | _/ __ \ 
- |  | \  ___/|  | \/  Y Y  \  |  / __ \| \_\ \  |_\  ___/ 
- |__|  \___  >__|  |__|_|  /__| (____  /___  /____/\___  >
-           \/            \/          \/    \/          \/ 
+/*
+________     ______
+\______ \   /  __  \  ______
+ |    |  \  >      < /  ___/
+ |    `   \/   --   \\___ \
+/_______  /\______  /____  >
+        \/        \/     \/
+*/
+
+const APP_NAME = `________     ______         
+\______ \   /  __  \  ______
+ |    |  \  >      < /  ___/
+ |    ` + "`" + `   \/   --   \\___ \ 
+/_______  /\______  /____  >
+        \/        \/     \/ 
 `
 
 const (
@@ -208,55 +216,54 @@ func (m model) View() string {
 	}
 }
 
-func hotkeys(app *tview.Application) *tview.List {
-	// hotkeyTable := tview.NewTable()
+type HotKey struct {
+	desc     string
+	action   func()
+	shortcut rune
+}
 
-	// lorem := strings.Split("Lorem ipsum dolor", " ")
-	// // cols, rows := 5, 2
-	// // word := 0
-	// // for r := 0; r < rows; r++ {
-	// // 	for c := 0; c < cols; c++ {
-	// // 		color := tcell.ColorWhite
-	// // 		if c < 1 || r < 1 {
-	// // 			color = tcell.ColorYellow
-	// // 		}
-	// // 		word = (word + 1) % len(lorem)
-	// // 	}
-	// // }
+type HotKeys struct {
+	*tview.List
+	values        []HotKey
+	currentOption int
+}
 
-	list := tview.NewList().ShowSecondaryText(false).
-		SetSelectedFocusOnly(true).
-		SetShortcutStyle(tcell.StyleDefault)
+func NewHotkeys() *HotKeys {
+	list := tview.NewList().
+		ShowSecondaryText(false).SetSelectedFocusOnly(true)
+	return &HotKeys{
+		List:   list,
+		values: []HotKey{},
+	}
+}
 
-	list.
-		AddItem("List item 1", "", 0, nil).
-		AddItem("List item 2", "", 0, nil).
-		AddItem("List item 3", "", 0, nil).
-		AddItem("List item 4", "", 0, nil).
-		AddItem("<q> quit", "", 0, func() {
-			app.Stop()
-		})
+func (r *HotKeys) AddHotKey(desc string, shortcut rune, action func()) *HotKeys {
+	r.values = append(r.values, HotKey{desc, action, shortcut})
+	return r
+}
 
-	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Rune() {
-		case 'a':
-			list.SetCurrentItem(0)
-			app.Stop()
-			return nil
-		case 'b':
-			list.SetCurrentItem(1)
-			app.Stop()
-			return nil
+func (r *HotKeys) Draw(screen tcell.Screen) {
+	r.Box.DrawForSubclass(screen, r)
+	x, y, width, height := r.GetInnerRect()
+
+	for index, hotkey := range r.values {
+		if index >= height {
+			break
 		}
-		return event
+
+		line := fmt.Sprintf("<%s> %s", string(hotkey.shortcut), hotkey.desc)
+		tview.Print(screen, line, x, y+index, width, tview.AlignLeft, tcell.ColorYellow)
+	}
+}
+
+func (r *HotKeys) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+	return r.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+		for _, hotkey := range r.values {
+			if event.Rune() == hotkey.shortcut && hotkey.action != nil {
+				hotkey.action()
+			}
+		}
 	})
-
-	// 		hotkeyTable.SetCell(0, 0,
-	// 			tview.NewTableCell(lorem[word]).
-	// 				SetTextColor(color).
-	// 				SetAlign(tview.AlignCenter))
-
-	return list
 }
 
 func currentConnectionInfo() *tview.List {
@@ -271,22 +278,22 @@ func currentConnectionInfo() *tview.List {
 	return list
 }
 
-func header(app *tview.Application) *tview.Flex {
+func header(hotkeyView *HotKeys) *tview.Flex {
 	connection := currentConnectionInfo()
 
-	table := hotkeys(app)
+	appName := tview.NewTextView().SetText(APP_NAME).SetTextAlign(tview.AlignRight)
 
 	headerView := tview.NewFlex().
 		AddItem(connection, 0, 1, false).
-		AddItem(table, 0, 2, false)
-		// AddItem(tview.NewBox(), 0, 2, false).
-		// AddItem(tview.NewBox(), 0, 3, false)
+		AddItem(hotkeyView, 0, 1, false).
+		AddItem(appName, 0, 1, false)
+	// AddItem(tview.NewBox(), 0, 3, false)
 	return headerView
 }
 
-func mainView(app *tview.Application) *tview.Flex {
+func mainView(header *tview.Flex) *tview.Flex {
 	flex := tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(header(app), 0, 1, false).
+		AddItem(header, 0, 1, false).
 		AddItem(tview.NewBox().SetBorder(true).SetTitle("Connections"), 0, 6, false)
 
 	return flex
@@ -294,9 +301,16 @@ func mainView(app *tview.Application) *tview.Flex {
 
 func main() {
 	app := tview.NewApplication()
-	mainView := mainView(app)
 
-	if err := app.SetRoot(mainView, true).SetFocus(mainView).Run(); err != nil {
+	hotkeyView := NewHotkeys().
+		AddHotKey("New Connection", 'n', nil).
+		AddHotKey("Quit", 'q', func() { app.Stop() })
+	header := header(hotkeyView)
+	mainView := mainView(header)
+
+	app.SetRoot(mainView, true).SetFocus(hotkeyView)
+
+	if err := app.Run(); err != nil {
 		panic(err)
 	}
 
