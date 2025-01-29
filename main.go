@@ -18,21 +18,12 @@ import (
 
 type CurrentView string
 
-/*
-________     ______
-\______ \   /  __  \  ______
- |    |  \  >      < /  ___/
- |    `   \/   --   \\___ \
-/_______  /\______  /____  >
-        \/        \/     \/
-*/
-
-const APP_NAME = `________     ______         
-\______ \   /  __  \  ______
- |    |  \  >      < /  ___/
- |    ` + "`" + `   \/   --   \\___ \ 
-/_______  /\______  /____  >
-        \/        \/     \/ 
+const APP_NAME = `_________________       
+\______ \______  \______
+ |    |  \  /    /  ___/
+ |    ` + "`" + `   \/    /\___ \ 
+/_______  /____//____  >
+        \/           \/ 
 `
 
 const (
@@ -291,6 +282,33 @@ func header(hotkeyView *HotKeys) *tview.Flex {
 	return headerView
 }
 
+func newConnectionForm(app *tview.Application) *tview.Flex {
+	form := tview.NewForm().
+		AddInputField("Name", "", 26, nil, nil).
+		AddInputField("Host", "", 26, nil, nil).
+		AddInputField("Port", "", 26, nil, nil).
+		AddInputField("User", "", 26, nil, nil).
+		AddPasswordField("Password", "", 26, '*', nil).
+		AddInputField("Database", "", 26, nil, nil).
+		AddButton("Save", nil).
+		AddButton("Test", nil).
+		AddButton("Connect", func() {
+			app.Stop()
+		})
+	form.SetBorder(true)
+	form.SetButtonsAlign(tview.AlignRight)
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 3, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(form, 0, 1, true).
+			AddItem(nil, 0, 1, false), 0, 2, true).
+		AddItem(nil, 0, 3, false)
+
+	return modal
+}
+
 func mainView(header *tview.Flex) *tview.Flex {
 	flex := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(header, 0, 1, false).
@@ -299,16 +317,28 @@ func mainView(header *tview.Flex) *tview.Flex {
 	return flex
 }
 
+const (
+	MAIN_PAGE          = "main"
+	NEW_CONNETION_FORM = "newConnection"
+)
+
 func main() {
 	app := tview.NewApplication()
 
-	hotkeyView := NewHotkeys().
-		AddHotKey("New Connection", 'n', nil).
-		AddHotKey("Quit", 'q', func() { app.Stop() })
+	hotkeyView := NewHotkeys()
 	header := header(hotkeyView)
 	mainView := mainView(header)
 
-	app.SetRoot(mainView, true).SetFocus(hotkeyView)
+	pages := tview.NewPages().
+		AddPage(MAIN_PAGE, mainView, true, true).
+		AddPage(NEW_CONNETION_FORM, newConnectionForm(app), true, false)
+	hotkeyView.
+		AddHotKey("New Connection", 'n', func() {
+			pages.ShowPage(NEW_CONNETION_FORM)
+		}).
+		AddHotKey("Quit", 'q', func() { app.Stop() })
+
+	app.SetRoot(pages, true).SetFocus(hotkeyView)
 
 	if err := app.Run(); err != nil {
 		panic(err)
