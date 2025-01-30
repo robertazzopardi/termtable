@@ -18,7 +18,7 @@ type Connection struct {
 	Host     string
 	Port     string
 	User     string
-	Pass     string
+	Password string
 	Database string
 	Name     string
 	status   ConnectionStatus
@@ -26,7 +26,7 @@ type Connection struct {
 
 func (params Connection) ConnectionString() string {
 	// urlExample := "postgres://username:password@localhost:5432/database_name"
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", params.User, params.Pass, params.Host, params.Port, params.Database)
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", params.User, params.Password, params.Host, params.Port, params.Database)
 }
 
 func (params *Connection) TestConnection() TestStatus {

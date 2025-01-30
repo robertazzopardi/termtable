@@ -75,7 +75,7 @@ func (m ExistingConnectionsModel) Update(msg tea.Msg) (ExistingConnectionsModel,
 						}
 
 						m.selectedConnection.User = user
-						m.selectedConnection.Pass = pass
+						m.selectedConnection.Password = pass
 
 						break
 					}

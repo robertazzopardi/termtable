@@ -168,7 +168,7 @@ func parseKeyringPassword(password string) (string, string, error) {
 
 func SaveConnectionInKeyring(conn Connection) {
 	// Save keyring part
-	password := createKeyringPassword(conn.User, conn.Pass)
+	password := createKeyringPassword(conn.User, conn.Password)
 	err := keyring.Set(SERVICE, conn.Name, password)
 
 	if err != nil {
@@ -207,8 +207,16 @@ func ListConnections() ([]Connection, error) {
 		if len(hostPortDb) != 3 {
 			continue
 		}
+
+		user, password, err := GetConnectionFromKeyring(k)
+		if err != nil {
+			log.Fatal("Could not get user and password for db", err)
+		}
+
 		conn := Connection{
 			Name:     k,
+			User:     user,
+			Password: password,
 			Host:     hostPortDb[0],
 			Port:     hostPortDb[1],
 			Database: hostPortDb[2],

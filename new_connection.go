@@ -127,7 +127,7 @@ func (m NewConnectionModel) Update(msg tea.Msg) (NewConnectionModel, tea.Cmd) {
 					Host:     m.inputs[0].Value(),
 					Port:     m.inputs[1].Value(),
 					User:     m.inputs[2].Value(),
-					Pass:     m.inputs[3].Value(),
+					Password: m.inputs[3].Value(),
 					Database: m.inputs[4].Value(),
 					Name:     m.inputs[5].Value(),
 					status:   DISCONNECTED,

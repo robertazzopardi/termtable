@@ -215,8 +215,7 @@ type HotKey struct {
 
 type HotKeys struct {
 	*tview.List
-	values        []HotKey
-	currentOption int
+	values []HotKey
 }
 
 func NewHotkeys() *HotKeys {
@@ -258,13 +257,14 @@ func (r *HotKeys) InputHandler() func(event *tcell.EventKey, setFocus func(p tvi
 }
 
 func currentConnectionInfo() *tview.List {
-	list := tview.NewList().ShowSecondaryText(false).
+	list := tview.NewList().
+		ShowSecondaryText(false).
 		SetSelectedFocusOnly(true).
-		AddItem(" Name: ", "", 0, nil).
-		AddItem(" Database: ", "", 0, nil).
-		AddItem(" Host: ", "", 0, nil).
-		AddItem(" PORT: ", "", 0, nil).
-		AddItem(" USER: ", "Press to exit", 0, nil)
+		AddItem("Name: ", "", 0, nil).
+		AddItem("Host: ", "", 0, nil).
+		AddItem("PORT: ", "", 0, nil).
+		AddItem("USER: ", "Press to exit", 0, nil).
+		AddItem("Database: ", "", 0, nil)
 
 	return list
 }
@@ -278,7 +278,8 @@ func header(hotkeyView *HotKeys) *tview.Flex {
 		AddItem(connection, 0, 1, false).
 		AddItem(hotkeyView, 0, 1, false).
 		AddItem(appName, 0, 1, false)
-	// AddItem(tview.NewBox(), 0, 3, false)
+	headerView.SetBorderPadding(0, 0, 1, 1)
+
 	return headerView
 }
 
@@ -309,36 +310,107 @@ func newConnectionForm(app *tview.Application) *tview.Flex {
 	return modal
 }
 
-func mainView(header *tview.Flex) *tview.Flex {
-	flex := tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(header, 0, 1, false).
-		AddItem(tview.NewBox().SetBorder(true).SetTitle("Connections"), 0, 6, false)
-
-	return flex
-}
-
 const (
 	MAIN_PAGE          = "main"
 	NEW_CONNETION_FORM = "newConnection"
+	SAVED_CONNECTIONS  = "savedConnections"
 )
+
+func savedConnections() *tview.Box {
+	connectionsView := tview.NewBox().SetBorder(true).SetTitle("Connections")
+
+	connections, err := ListConnections()
+
+	if err != nil {
+		return connectionsView
+	}
+
+	table := tview.NewTable()
+
+	for i, conn := range connections {
+		table.SetCell(i, 0, tview.NewTableCell(conn.Name))
+		table.SetCell(i, 1, tview.NewTableCell(conn.Host))
+		table.SetCell(i, 2, tview.NewTableCell(conn.Port))
+		table.SetCell(i, 3, tview.NewTableCell(conn.User))
+		table.SetCell(i, 4, tview.NewTableCell(conn.Database))
+	}
+
+	table.SetBorderPadding(0, 0, 1, 1)
+	// table.Select(0, 0).SetFixed(1, 1).SetDoneFunc(func(key tcell.Key) {
+	// 	if key == tcell.KeyEscape {
+	// 		app.Stop()
+	// 	}
+	// 	if key == tcell.KeyEnter {
+	// 		table.SetSelectable(true, true)
+	// 	}
+	// }).SetSelectedFunc(func(row int, column int) {
+	// 	table.GetCell(row, column).SetTextColor(tcell.ColorRed)
+	// 	table.SetSelectable(false, false)
+	// })
+
+	connectionsView.SetDrawFunc(func(screen tcell.Screen, x int, y int, w int, h int) (int, int, int, int) {
+		centerY := y + 1
+		centerX := x + 1
+
+		table.SetRect(centerX, centerY, w-2, h-2)
+		table.Draw(screen)
+
+		// Space for other content.
+		return x + 1, centerY + 1, w - 2, h - (centerY + 1 - y)
+	})
+
+	return connectionsView
+}
+
+func contentView() *tview.Pages {
+	pages := tview.NewPages().
+		AddPage(SAVED_CONNECTIONS, savedConnections(), true, true)
+
+	return pages
+}
+
+func mainLayout(header *tview.Flex) *tview.Flex {
+	pages := contentView()
+
+	flex := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(header, 0, 1, false).
+		AddItem(pages, 0, 6, false)
+
+	return flex
+}
 
 func main() {
 	app := tview.NewApplication()
 
 	hotkeyView := NewHotkeys()
 	header := header(hotkeyView)
-	mainView := mainView(header)
+	mainView := mainLayout(header)
 
-	pages := tview.NewPages().
+	mainPages := tview.NewPages().
 		AddPage(MAIN_PAGE, mainView, true, true).
 		AddPage(NEW_CONNETION_FORM, newConnectionForm(app), true, false)
 	hotkeyView.
 		AddHotKey("New Connection", 'n', func() {
-			pages.ShowPage(NEW_CONNETION_FORM)
+			mainPages.ShowPage(NEW_CONNETION_FORM)
 		}).
 		AddHotKey("Quit", 'q', func() { app.Stop() })
 
-	app.SetRoot(pages, true).SetFocus(hotkeyView)
+	app.SetRoot(mainPages, true).SetFocus(mainView)
+
+	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		name, _ := mainPages.GetFrontPage()
+
+		switch name {
+		case MAIN_PAGE:
+			if event.Rune() == 'q' {
+				app.Stop()
+			}
+		default:
+
+		}
+
+		return event
+	})
 
 	if err := app.Run(); err != nil {
 		panic(err)
