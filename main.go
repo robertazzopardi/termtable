@@ -209,7 +209,6 @@ func (m model) View() string {
 
 type HotKey struct {
 	desc     string
-	action   func()
 	shortcut rune
 }
 
@@ -227,8 +226,8 @@ func NewHotkeys() *HotKeys {
 	}
 }
 
-func (r *HotKeys) AddHotKey(desc string, shortcut rune, action func()) *HotKeys {
-	r.values = append(r.values, HotKey{desc, action, shortcut})
+func (r *HotKeys) AddHotKey(desc string, shortcut rune) *HotKeys {
+	r.values = append(r.values, HotKey{desc, shortcut})
 	return r
 }
 
@@ -246,15 +245,15 @@ func (r *HotKeys) Draw(screen tcell.Screen) {
 	}
 }
 
-func (r *HotKeys) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-	return r.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-		for _, hotkey := range r.values {
-			if event.Rune() == hotkey.shortcut && hotkey.action != nil {
-				hotkey.action()
-			}
-		}
-	})
-}
+// func (r *HotKeys) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+// 	return r.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+// 		for _, hotkey := range r.values {
+// 			if event.Rune() == hotkey.shortcut && hotkey.action != nil {
+// 				hotkey.action()
+// 			}
+// 		}
+// 	})
+// }
 
 func currentConnectionInfo() *tview.List {
 	list := tview.NewList().
@@ -327,15 +326,23 @@ func savedConnections() *tview.Box {
 
 	table := tview.NewTable()
 
+	table.SetCell(0, 0, tview.NewTableCell("Name").SetExpansion(1))
+	table.SetCell(0, 1, tview.NewTableCell("Host").SetExpansion(1))
+	table.SetCell(0, 2, tview.NewTableCell("Port").SetExpansion(1))
+	table.SetCell(0, 3, tview.NewTableCell("User").SetExpansion(1))
+	table.SetCell(0, 4, tview.NewTableCell("Database").SetExpansion(1))
+
 	for i, conn := range connections {
-		table.SetCell(i, 0, tview.NewTableCell(conn.Name))
-		table.SetCell(i, 1, tview.NewTableCell(conn.Host))
-		table.SetCell(i, 2, tview.NewTableCell(conn.Port))
-		table.SetCell(i, 3, tview.NewTableCell(conn.User))
-		table.SetCell(i, 4, tview.NewTableCell(conn.Database))
+		table.SetCell(i+1, 0, tview.NewTableCell(conn.Name))
+		table.SetCell(i+1, 1, tview.NewTableCell(conn.Host))
+		table.SetCell(i+1, 2, tview.NewTableCell(conn.Port))
+		table.SetCell(i+1, 3, tview.NewTableCell(conn.User))
+		table.SetCell(i+1, 4, tview.NewTableCell(conn.Database))
 	}
 
 	table.SetBorderPadding(0, 0, 1, 1)
+
+	table.SetSelectable(true, false)
 	// table.Select(0, 0).SetFixed(1, 1).SetDoneFunc(func(key tcell.Key) {
 	// 	if key == tcell.KeyEscape {
 	// 		app.Stop()
@@ -362,21 +369,25 @@ func savedConnections() *tview.Box {
 	return connectionsView
 }
 
-func contentView() *tview.Pages {
+func mainContent() *tview.Pages {
 	pages := tview.NewPages().
 		AddPage(SAVED_CONNECTIONS, savedConnections(), true, true)
 
 	return pages
 }
 
-func mainLayout(header *tview.Flex) *tview.Flex {
-	pages := contentView()
+type Layout struct {
+	*tview.Flex
+	header  *tview.Flex
+	content *tview.Pages
+}
 
-	flex := tview.NewFlex().SetDirection(tview.FlexRow).
+func newLayout(header *tview.Flex, content *tview.Pages) Layout {
+	view := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(header, 0, 1, false).
-		AddItem(pages, 0, 6, false)
+		AddItem(content, 0, 6, false)
 
-	return flex
+	return Layout{view, header, content}
 }
 
 func main() {
@@ -384,27 +395,38 @@ func main() {
 
 	hotkeyView := NewHotkeys()
 	header := header(hotkeyView)
-	mainView := mainLayout(header)
+	pages := mainContent()
+	mainView := newLayout(header, pages)
 
-	mainPages := tview.NewPages().
-		AddPage(MAIN_PAGE, mainView, true, true).
-		AddPage(NEW_CONNETION_FORM, newConnectionForm(app), true, false)
+	mainPanels := tview.NewPages().
+		AddPage(MAIN_PAGE, mainView, true, true)
+
 	hotkeyView.
-		AddHotKey("New Connection", 'n', func() {
-			mainPages.ShowPage(NEW_CONNETION_FORM)
-		}).
-		AddHotKey("Quit", 'q', func() { app.Stop() })
-
-	app.SetRoot(mainPages, true).SetFocus(mainView)
+		AddHotKey("New Connection", 'n').
+		AddHotKey("Quit", 'q')
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		name, _ := mainPages.GetFrontPage()
+		pageName, _ := mainPanels.GetFrontPage()
+		contentName, _ := mainView.content.GetFrontPage()
 
-		switch name {
-		case MAIN_PAGE:
-			if event.Rune() == 'q' {
+		switch contentName {
+		case SAVED_CONNECTIONS:
+			switch event.Rune() {
+			case 'q':
 				app.Stop()
+			case 'n':
+				if pageName == NEW_CONNETION_FORM {
+					return event
+				}
+				addConnectionForm := newConnectionForm(app)
+				mainPanels.AddPage(NEW_CONNETION_FORM, addConnectionForm, true, true)
+				return nil
 			}
+
+			if event.Key() == tcell.KeyESC {
+				mainPanels.RemovePage(NEW_CONNETION_FORM)
+			}
+
 		default:
 
 		}
@@ -412,7 +434,7 @@ func main() {
 		return event
 	})
 
-	if err := app.Run(); err != nil {
+	if err := app.SetRoot(mainPanels, true).SetFocus(mainView).Run(); err != nil {
 		panic(err)
 	}
 
