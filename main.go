@@ -315,22 +315,20 @@ const (
 	SAVED_CONNECTIONS  = "savedConnections"
 )
 
-func savedConnections() *tview.Box {
-	connectionsView := tview.NewBox().SetBorder(true).SetTitle("Connections")
-
+func savedConnections() *tview.Table {
 	connections, err := ListConnections()
 
 	if err != nil {
-		return connectionsView
+		return nil
 	}
 
 	table := tview.NewTable()
 
-	table.SetCell(0, 0, tview.NewTableCell("Name").SetExpansion(1))
-	table.SetCell(0, 1, tview.NewTableCell("Host").SetExpansion(1))
-	table.SetCell(0, 2, tview.NewTableCell("Port").SetExpansion(1))
-	table.SetCell(0, 3, tview.NewTableCell("User").SetExpansion(1))
-	table.SetCell(0, 4, tview.NewTableCell("Database").SetExpansion(1))
+	table.SetCell(0, 0, tview.NewTableCell("NAME").SetExpansion(1))
+	table.SetCell(0, 1, tview.NewTableCell("HOST").SetExpansion(1))
+	table.SetCell(0, 2, tview.NewTableCell("PORT").SetExpansion(1))
+	table.SetCell(0, 3, tview.NewTableCell("USER").SetExpansion(1))
+	table.SetCell(0, 4, tview.NewTableCell("DATABASE").SetExpansion(1))
 
 	for i, conn := range connections {
 		table.SetCell(i+1, 0, tview.NewTableCell(conn.Name))
@@ -343,37 +341,29 @@ func savedConnections() *tview.Box {
 	table.SetBorderPadding(0, 0, 1, 1)
 
 	table.SetSelectable(true, false)
-	// table.Select(0, 0).SetFixed(1, 1).SetDoneFunc(func(key tcell.Key) {
-	// 	if key == tcell.KeyEscape {
-	// 		app.Stop()
-	// 	}
-	// 	if key == tcell.KeyEnter {
-	// 		table.SetSelectable(true, true)
-	// 	}
-	// }).SetSelectedFunc(func(row int, column int) {
-	// 	table.GetCell(row, column).SetTextColor(tcell.ColorRed)
-	// 	table.SetSelectable(false, false)
-	// })
+	table.Select(1, 0)
 
-	connectionsView.SetDrawFunc(func(screen tcell.Screen, x int, y int, w int, h int) (int, int, int, int) {
-		centerY := y + 1
-		centerX := x + 1
-
-		table.SetRect(centerX, centerY, w-2, h-2)
-		table.Draw(screen)
-
-		// Space for other content.
-		return x + 1, centerY + 1, w - 2, h - (centerY + 1 - y)
-	})
-
-	return connectionsView
+	return table
 }
 
-func mainContent() *tview.Pages {
-	pages := tview.NewPages().
-		AddPage(SAVED_CONNECTIONS, savedConnections(), true, true)
+type ContentBox struct {
+	*tview.Box
+	content tview.Primitive
+}
 
-	return pages
+func newContentBox(title string, content tview.Primitive) *ContentBox {
+	return &ContentBox{
+		tview.NewBox().SetBorder(true).SetTitle(title),
+		content,
+	}
+}
+
+func (b *ContentBox) Draw(screen tcell.Screen) {
+	b.Box.DrawForSubclass(screen, b)
+	x, y, w, h := b.GetInnerRect()
+
+	b.content.SetRect(x, y, w, h)
+	b.content.Draw(screen)
 }
 
 type Layout struct {
@@ -393,20 +383,22 @@ func newLayout(header *tview.Flex, content *tview.Pages) Layout {
 func main() {
 	app := tview.NewApplication()
 
-	hotkeyView := NewHotkeys()
-	header := header(hotkeyView)
-	pages := mainContent()
-	mainView := newLayout(header, pages)
-
-	mainPanels := tview.NewPages().
-		AddPage(MAIN_PAGE, mainView, true, true)
-
-	hotkeyView.
+	hotkeyView := NewHotkeys().
 		AddHotKey("New Connection", 'n').
 		AddHotKey("Quit", 'q')
+	header := header(hotkeyView)
+
+	connectionsView := newContentBox("Connections", savedConnections())
+
+	pages := tview.NewPages().
+		AddPage(SAVED_CONNECTIONS, connectionsView, true, true)
+	mainView := newLayout(header, pages)
+
+	mainScreens := tview.NewPages().
+		AddPage(MAIN_PAGE, mainView, true, true)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		pageName, _ := mainPanels.GetFrontPage()
+		pageName, _ := mainScreens.GetFrontPage()
 		contentName, _ := mainView.content.GetFrontPage()
 
 		switch contentName {
@@ -419,12 +411,12 @@ func main() {
 					return event
 				}
 				addConnectionForm := newConnectionForm(app)
-				mainPanels.AddPage(NEW_CONNETION_FORM, addConnectionForm, true, true)
+				mainScreens.AddPage(NEW_CONNETION_FORM, addConnectionForm, true, true)
 				return nil
 			}
 
 			if event.Key() == tcell.KeyESC {
-				mainPanels.RemovePage(NEW_CONNETION_FORM)
+				mainScreens.RemovePage(NEW_CONNETION_FORM)
 			}
 
 		default:
@@ -434,7 +426,7 @@ func main() {
 		return event
 	})
 
-	if err := app.SetRoot(mainPanels, true).SetFocus(mainView).Run(); err != nil {
+	if err := app.SetRoot(mainScreens, true).SetFocus(connectionsView.content).Run(); err != nil {
 		panic(err)
 	}
 
