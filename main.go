@@ -245,16 +245,6 @@ func (r *HotKeys) Draw(screen tcell.Screen) {
 	}
 }
 
-// func (r *HotKeys) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-// 	return r.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-// 		for _, hotkey := range r.values {
-// 			if event.Rune() == hotkey.shortcut && hotkey.action != nil {
-// 				hotkey.action()
-// 			}
-// 		}
-// 	})
-// }
-
 func currentConnectionInfo() *tview.List {
 	list := tview.NewList().
 		ShowSecondaryText(false).
@@ -353,7 +343,7 @@ type ContentBox struct {
 
 func newContentBox(title string, content tview.Primitive) *ContentBox {
 	return &ContentBox{
-		tview.NewBox().SetBorder(true).SetTitle(title),
+		tview.NewBox().SetTitle(title),
 		content,
 	}
 }
@@ -364,6 +354,12 @@ func (b *ContentBox) Draw(screen tcell.Screen) {
 
 	b.content.SetRect(x, y, w, h)
 	b.content.Draw(screen)
+}
+
+func (b *ContentBox) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+	return b.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+		b.content.InputHandler()(event, setFocus)
+	})
 }
 
 type Layout struct {
@@ -390,15 +386,16 @@ func main() {
 
 	connectionsView := newContentBox("Connections", savedConnections())
 
-	pages := tview.NewPages().
-		AddPage(SAVED_CONNECTIONS, connectionsView, true, true)
-	mainView := newLayout(header, pages)
+	contentPages := tview.NewPages().
+		AddAndSwitchToPage(SAVED_CONNECTIONS, connectionsView, true)
+	contentPages.SetBorder(true)
+	mainView := newLayout(header, contentPages)
 
-	mainScreens := tview.NewPages().
-		AddPage(MAIN_PAGE, mainView, true, true)
+	mainPages := tview.NewPages().
+		AddAndSwitchToPage(MAIN_PAGE, mainView, true)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		pageName, _ := mainScreens.GetFrontPage()
+		pageName, _ := mainPages.GetFrontPage()
 		contentName, _ := mainView.content.GetFrontPage()
 
 		switch contentName {
@@ -411,12 +408,12 @@ func main() {
 					return event
 				}
 				addConnectionForm := newConnectionForm(app)
-				mainScreens.AddPage(NEW_CONNETION_FORM, addConnectionForm, true, true)
+				mainPages.AddPage(NEW_CONNETION_FORM, addConnectionForm, true, true)
 				return nil
 			}
 
 			if event.Key() == tcell.KeyESC {
-				mainScreens.RemovePage(NEW_CONNETION_FORM)
+				mainPages.RemovePage(NEW_CONNETION_FORM)
 			}
 
 		default:
@@ -426,7 +423,7 @@ func main() {
 		return event
 	})
 
-	if err := app.SetRoot(mainScreens, true).SetFocus(connectionsView.content).Run(); err != nil {
+	if err := app.SetRoot(mainPages, true).SetFocus(contentPages).Run(); err != nil {
 		panic(err)
 	}
 
