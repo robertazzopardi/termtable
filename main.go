@@ -346,9 +346,43 @@ func (t *DisplayTable) getConnections() {
 	t.rows = connections
 }
 
-func (t *DisplayTable) getConnection() Connection {
+func (t *DisplayTable) getConnection() *Connection {
 	row, _ := t.GetSelection()
-	return t.rows[row]
+
+	if row == 0 {
+		return nil
+	}
+
+	return &t.rows[row-1]
+}
+
+type DbTable struct {
+	*tview.Table
+	table Table
+}
+
+func newDbTable(table Table) *DbTable {
+	t := tview.NewTable()
+
+	for i, header := range table.fields {
+		t.SetCell(0, i, tview.NewTableCell(header).SetExpansion(1))
+	}
+
+	t.SetBorderPadding(0, 0, 1, 1)
+	t.SetSelectable(true, false).Select(1, 0)
+
+	connectionsTable := DbTable{t, table}
+	connectionsTable.getTableRows()
+
+	return &connectionsTable
+}
+
+func (t *DbTable) getTableRows() {
+	for i, conn := range t.table.values {
+		for j, value := range conn {
+			t.SetCell(i+1, j, tview.NewTableCell(value))
+		}
+	}
 }
 
 type ContentBox struct {
@@ -358,7 +392,7 @@ type ContentBox struct {
 
 func newContentBox(title string, content tview.Primitive) *ContentBox {
 	return &ContentBox{
-		tview.NewBox().SetBorder(true).SetTitle(title),
+		tview.NewBox().SetBorder(true).SetTitle(fmt.Sprintf(" %s ", title)),
 		content,
 	}
 }
@@ -432,9 +466,12 @@ func main() {
 				mainPages.RemovePage(NEW_CONNETION_FORM)
 			case tcell.KeyEnter:
 				connection := connectionsTable.getConnection()
-				db := NewOpenDatabase(connection)
-				// TODO pass rows
-				dbTable := newConnectionsTable(db.openTable.fields)
+				if connection == nil {
+					return event
+				}
+
+				db := NewOpenDatabase(*connection)
+				dbTable := newDbTable(db.openTable)
 				dbContent := newContentBox(db.openTable.name, dbTable)
 				contentPages.AddAndSwitchToPage(DATABASE_VIEW, dbContent, true)
 			}
