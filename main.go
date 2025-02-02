@@ -13,7 +13,6 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	// "github.com/gdamore/tcell/v2"
 )
 
 type CurrentView string
@@ -305,13 +304,12 @@ const (
 	SAVED_CONNECTIONS  = "savedConnections"
 )
 
-func savedConnections() *tview.Table {
-	connections, err := ListConnections()
+type ConnectionsTable struct {
+	*tview.Table
+	connections []Connection
+}
 
-	if err != nil {
-		return nil
-	}
-
+func newConnectionsTable() *ConnectionsTable {
 	table := tview.NewTable()
 
 	table.SetCell(0, 0, tview.NewTableCell("NAME").SetExpansion(1))
@@ -320,20 +318,36 @@ func savedConnections() *tview.Table {
 	table.SetCell(0, 3, tview.NewTableCell("USER").SetExpansion(1))
 	table.SetCell(0, 4, tview.NewTableCell("DATABASE").SetExpansion(1))
 
-	for i, conn := range connections {
-		table.SetCell(i+1, 0, tview.NewTableCell(conn.Name))
-		table.SetCell(i+1, 1, tview.NewTableCell(conn.Host))
-		table.SetCell(i+1, 2, tview.NewTableCell(conn.Port))
-		table.SetCell(i+1, 3, tview.NewTableCell(conn.User))
-		table.SetCell(i+1, 4, tview.NewTableCell(conn.Database))
+	table.SetBorderPadding(0, 0, 1, 1)
+	table.SetSelectable(true, false).Select(1, 0)
+
+	connectionsTable := ConnectionsTable{table, []Connection{}}
+	connectionsTable.getConnections()
+
+	return &connectionsTable
+}
+
+func (ct *ConnectionsTable) getConnections() {
+	connections, err := ListConnections()
+
+	if err != nil {
+		return
 	}
 
-	table.SetBorderPadding(0, 0, 1, 1)
+	for i, conn := range connections {
+		ct.SetCell(i+1, 0, tview.NewTableCell(conn.Name))
+		ct.SetCell(i+1, 1, tview.NewTableCell(conn.Host))
+		ct.SetCell(i+1, 2, tview.NewTableCell(conn.Port))
+		ct.SetCell(i+1, 3, tview.NewTableCell(conn.User))
+		ct.SetCell(i+1, 4, tview.NewTableCell(conn.Database))
+	}
 
-	table.SetSelectable(true, false)
-	table.Select(1, 0)
+	ct.connections = connections
+}
 
-	return table
+func (ct *ConnectionsTable) getConnection() Connection {
+	row, _ := ct.GetSelection()
+	return ct.connections[row]
 }
 
 type ContentBox struct {
@@ -384,7 +398,8 @@ func main() {
 		AddHotKey("Quit", 'q')
 	header := header(hotkeyView)
 
-	connectionsView := newContentBox("Connections", savedConnections())
+	connectionsTable := newConnectionsTable()
+	connectionsView := newContentBox("Connections", connectionsTable)
 
 	contentPages := tview.NewPages().
 		AddAndSwitchToPage(SAVED_CONNECTIONS, connectionsView, true)
@@ -412,8 +427,11 @@ func main() {
 				return nil
 			}
 
-			if event.Key() == tcell.KeyESC {
+			switch event.Key() {
+			case tcell.KeyESC:
 				mainPages.RemovePage(NEW_CONNETION_FORM)
+			case tcell.KeyEnter:
+				fmt.Println(connectionsTable.getConnection())
 			}
 
 		default:
@@ -423,6 +441,7 @@ func main() {
 		return event
 	})
 
+	// TODO somthing with focus is causing the extra border outline
 	if err := app.SetRoot(mainPages, true).SetFocus(contentPages).Run(); err != nil {
 		panic(err)
 	}
