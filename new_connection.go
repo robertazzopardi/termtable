@@ -13,7 +13,6 @@ type TestStatus string
 const (
 	PASSED TestStatus = "PASSED"
 	FAILED TestStatus = "FAILED"
-	NA     TestStatus = "NA"
 )
 
 type NewConnectionModel struct {

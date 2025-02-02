@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -183,33 +184,44 @@ func currentConnectionInfo() *tview.List {
 	return list
 }
 
-func header(hotkeyView *HotKeys) *tview.Flex {
+func headerPanel(hotkeys *tview.Pages) *tview.Flex {
 	connection := currentConnectionInfo()
 
 	appName := tview.NewTextView().SetText(APP_NAME).SetTextAlign(tview.AlignRight)
 
 	headerView := tview.NewFlex().
 		AddItem(connection, 0, 1, false).
-		AddItem(hotkeyView, 0, 1, false).
+		AddItem(hotkeys, 0, 1, false).
 		AddItem(appName, 0, 1, false)
 	headerView.SetBorderPadding(0, 0, 1, 1)
 
 	return headerView
 }
 
-func newConnectionForm(app *tview.Application) *tview.Flex {
+func newConnectionForm(conn Connection, escapeFunc func()) *tview.Flex {
 	form := tview.NewForm().
-		AddInputField("Name", "", 26, nil, nil).
-		AddInputField("Host", "", 26, nil, nil).
-		AddInputField("Port", "", 26, nil, nil).
-		AddInputField("User", "", 26, nil, nil).
-		AddPasswordField("Password", "", 26, '*', nil).
-		AddInputField("Database", "", 26, nil, nil).
+		AddInputField("Name", conn.Name, 26, nil, func(text string) { conn.Name = text }).
+		AddInputField("Host", conn.Host, 26, nil, func(text string) { conn.Host = text }).
+		AddInputField("Port", conn.Port, 26, func(textToCheck string, lastChar rune) bool {
+			_, err := strconv.Atoi(textToCheck)
+			return err == nil
+		}, func(text string) { conn.Port = text }).
+		AddInputField("User", conn.User, 26, nil, func(text string) { conn.User = text }).
+		AddPasswordField("Password", conn.Password, 26, '*', func(text string) { conn.Password = text }).
+		AddInputField("Database", conn.Database, 26, nil, func(text string) { conn.Database = text }).
 		AddButton("Save", nil).
-		AddButton("Test", nil).
+		AddButton("Test", func() {
+			testResult := conn.TestConnection()
+			switch testResult {
+			case PASSED:
+				// TODO show modal here for passed and failed jobs
+			case FAILED:
+			}
+		}).
 		AddButton("Connect", func() {
-			app.Stop()
+			// TODO save and connect
 		})
+
 	form.SetBorder(true)
 	form.SetButtonsAlign(tview.AlignRight)
 
@@ -221,14 +233,21 @@ func newConnectionForm(app *tview.Application) *tview.Flex {
 			AddItem(nil, 0, 1, false), 0, 2, true).
 		AddItem(nil, 0, 3, false)
 
+	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyESC {
+			escapeFunc()
+		}
+		return event
+	})
+
 	return modal
 }
 
 const (
-	MAIN_PAGE          = "main"
-	NEW_CONNETION_FORM = "newConnection"
-	SAVED_CONNECTIONS  = "savedConnections"
-	DATABASE_VIEW      = "databaseView"
+	MAIN_PAGE           = "main"
+	NEW_CONNECTION_FORM = "newConnection"
+	SAVED_CONNECTIONS   = "savedConnections"
+	DATABASE_VIEW       = "databaseView"
 )
 
 var CONNECTION_TABLE_HEADERS = []string{"NAME", "HOST", "PORT", "USER", "DATABASE"}
@@ -358,7 +377,8 @@ func main() {
 		AddHotKey("New Connection", 'n').
 		AddHotKey("Edit Connection", 'e').
 		AddHotKey("Quit", 'q')
-	header := header(hotkeyView)
+	hotkeyPages := tview.NewPages().AddAndSwitchToPage("connectionHotkeys", hotkeyView, true)
+	header := headerPanel(hotkeyPages)
 
 	connectionsTable := newConnectionsTable(CONNECTION_TABLE_HEADERS)
 	connectionsView := newContentBox("Connections", connectionsTable)
@@ -372,25 +392,47 @@ func main() {
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		pageName, _ := mainPages.GetFrontPage()
-		contentName, _ := mainView.content.GetFrontPage()
+		// contentName, _ := mainView.content.GetFrontPage()
+		currentHotkeys, _ := hotkeyPages.GetFrontPage()
 
-		switch contentName {
-		case SAVED_CONNECTIONS:
+		switch currentHotkeys {
+		case "connectionHotkeys":
+			if pageName == NEW_CONNECTION_FORM {
+				return event
+			}
+
 			switch event.Rune() {
 			case 'q':
 				app.Stop()
 			case 'n':
-				if pageName == NEW_CONNETION_FORM {
+				if pageName == NEW_CONNECTION_FORM {
 					return event
 				}
-				addConnectionForm := newConnectionForm(app)
-				mainPages.AddPage(NEW_CONNETION_FORM, addConnectionForm, true, true)
+
+				addConnectionForm := newConnectionForm(Connection{}, func() {
+					mainPages.RemovePage(NEW_CONNECTION_FORM)
+					app.SetFocus(contentPages)
+				})
+				mainPages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
+				return nil
+			case 'e':
+				connection := connectionsTable.getConnection()
+				if connection == nil {
+					return event
+				}
+
+				addConnectionForm := newConnectionForm(*connection, func() {
+					mainPages.RemovePage(NEW_CONNECTION_FORM)
+					app.SetFocus(contentPages)
+				})
+				mainPages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
 				return nil
 			}
 
 			switch event.Key() {
 			case tcell.KeyESC:
-				mainPages.RemovePage(NEW_CONNETION_FORM)
+				mainPages.RemovePage(NEW_CONNECTION_FORM)
+				app.SetFocus(contentPages)
 			case tcell.KeyEnter:
 				connection := connectionsTable.getConnection()
 				if connection == nil {
