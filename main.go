@@ -30,7 +30,7 @@ const (
 	NEW_CONNECTION  CurrentView = "NEW_CONNECTION"
 	EDIT_CONNECTION CurrentView = "EDIT_CONNECTION"
 	JOIN_EXISTING   CurrentView = "JOIN_EXISTING"
-	DATABASE_VIEW   CurrentView = "DATABASE_VIEW"
+	// DATABASE_VIEW   CurrentView = "DATABASE_VIEW"
 )
 
 const (
@@ -302,32 +302,34 @@ const (
 	MAIN_PAGE          = "main"
 	NEW_CONNETION_FORM = "newConnection"
 	SAVED_CONNECTIONS  = "savedConnections"
+	DATABASE_VIEW      = "databaseView"
 )
 
-type ConnectionsTable struct {
+var CONNECTION_TABLE_HEADERS = []string{"NAME", "HOST", "PORT", "USER", "DATABASE"}
+
+type DisplayTable struct {
 	*tview.Table
-	connections []Connection
+	columns []string
+	rows    []Connection
 }
 
-func newConnectionsTable() *ConnectionsTable {
+func newConnectionsTable(columns []string) *DisplayTable {
 	table := tview.NewTable()
 
-	table.SetCell(0, 0, tview.NewTableCell("NAME").SetExpansion(1))
-	table.SetCell(0, 1, tview.NewTableCell("HOST").SetExpansion(1))
-	table.SetCell(0, 2, tview.NewTableCell("PORT").SetExpansion(1))
-	table.SetCell(0, 3, tview.NewTableCell("USER").SetExpansion(1))
-	table.SetCell(0, 4, tview.NewTableCell("DATABASE").SetExpansion(1))
+	for i, header := range columns {
+		table.SetCell(0, i, tview.NewTableCell(header).SetExpansion(1))
+	}
 
 	table.SetBorderPadding(0, 0, 1, 1)
 	table.SetSelectable(true, false).Select(1, 0)
 
-	connectionsTable := ConnectionsTable{table, []Connection{}}
+	connectionsTable := DisplayTable{table, columns, []Connection{}}
 	connectionsTable.getConnections()
 
 	return &connectionsTable
 }
 
-func (ct *ConnectionsTable) getConnections() {
+func (t *DisplayTable) getConnections() {
 	connections, err := ListConnections()
 
 	if err != nil {
@@ -335,19 +337,18 @@ func (ct *ConnectionsTable) getConnections() {
 	}
 
 	for i, conn := range connections {
-		ct.SetCell(i+1, 0, tview.NewTableCell(conn.Name))
-		ct.SetCell(i+1, 1, tview.NewTableCell(conn.Host))
-		ct.SetCell(i+1, 2, tview.NewTableCell(conn.Port))
-		ct.SetCell(i+1, 3, tview.NewTableCell(conn.User))
-		ct.SetCell(i+1, 4, tview.NewTableCell(conn.Database))
+		values := conn.Row()
+		for j, value := range values {
+			t.SetCell(i+1, j, tview.NewTableCell(value))
+		}
 	}
 
-	ct.connections = connections
+	t.rows = connections
 }
 
-func (ct *ConnectionsTable) getConnection() Connection {
-	row, _ := ct.GetSelection()
-	return ct.connections[row]
+func (t *DisplayTable) getConnection() Connection {
+	row, _ := t.GetSelection()
+	return t.rows[row]
 }
 
 type ContentBox struct {
@@ -357,7 +358,7 @@ type ContentBox struct {
 
 func newContentBox(title string, content tview.Primitive) *ContentBox {
 	return &ContentBox{
-		tview.NewBox().SetTitle(title),
+		tview.NewBox().SetBorder(true).SetTitle(title),
 		content,
 	}
 }
@@ -398,12 +399,11 @@ func main() {
 		AddHotKey("Quit", 'q')
 	header := header(hotkeyView)
 
-	connectionsTable := newConnectionsTable()
+	connectionsTable := newConnectionsTable(CONNECTION_TABLE_HEADERS)
 	connectionsView := newContentBox("Connections", connectionsTable)
 
 	contentPages := tview.NewPages().
 		AddAndSwitchToPage(SAVED_CONNECTIONS, connectionsView, true)
-	contentPages.SetBorder(true)
 	mainView := newLayout(header, contentPages)
 
 	mainPages := tview.NewPages().
@@ -431,7 +431,12 @@ func main() {
 			case tcell.KeyESC:
 				mainPages.RemovePage(NEW_CONNETION_FORM)
 			case tcell.KeyEnter:
-				fmt.Println(connectionsTable.getConnection())
+				connection := connectionsTable.getConnection()
+				db := NewOpenDatabase(connection)
+				// TODO pass rows
+				dbTable := newConnectionsTable(db.openTable.fields)
+				dbContent := newContentBox(db.openTable.name, dbTable)
+				contentPages.AddAndSwitchToPage(DATABASE_VIEW, dbContent, true)
 			}
 
 		default:

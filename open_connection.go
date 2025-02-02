@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/table"
+	// "github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -68,29 +69,31 @@ func (d tableItemDelegate) Render(w io.Writer, m list.Model, index int, listItem
 }
 
 type OpenDatabase struct {
-	tables        list.Model
-	viewMode      ViewMode
-	selectedTable table.Model
-	params        Connection
+	tables   []string
+	viewMode ViewMode
+	// selectedTable table.Model
+	params    Connection
+	openTable Table
 }
 
 func NewOpenDatabase(connParams Connection) OpenDatabase {
 	databaseTables := connParams.GetTableNames()
 
-	listItems := []list.Item{}
-	for _, value := range databaseTables {
-		listItems = append(listItems, tableItem(value))
-	}
+	// listItems := []list.Item{}
+	// for _, value := range databaseTables {
+	// 	listItems = append(listItems, tableItem(value))
+	// }
 
 	openDatabase := OpenDatabase{
-		tables:   list.New(listItems, tableItemDelegate{}, 14, 14),
+		// tables:   list.New(listItems, tableItemDelegate{}, 14, 14),
+		tables:   databaseTables,
 		viewMode: TABLES,
 		params:   connParams,
 	}
 
-	openDatabase.tables.SetShowHelp(false)
-	openDatabase.tables.SetShowTitle(false)
-	openDatabase.tables.SetShowStatusBar(false)
+	// openDatabase.tables.SetShowHelp(false)
+	// openDatabase.tables.SetShowTitle(false)
+	// openDatabase.tables.SetShowStatusBar(false)
 
 	openDatabase.setOpenTable()
 
@@ -98,60 +101,29 @@ func NewOpenDatabase(connParams Connection) OpenDatabase {
 }
 
 func (db *OpenDatabase) setOpenTable() {
-	selectedItem := db.tables.SelectedItem()
-	tableName := string(selectedItem.(tableItem))
+	tableName := db.tables[0]
 
-	selectedTable, err := db.openTable(tableName)
+	table, err := db.params.SelectAll(tableName)
+	// selectedTable, err := db.openTable(tableName)
 
 	if err != nil {
-		db.params.status = DISCONNECTED
+		// db.params.status = DISCONNECTED
+		log.Fatal("Could not connect to db", err)
 		return
 	}
 
-	db.selectedTable = selectedTable
-	db.selectedTable.SetWidth(width / 2)
-	db.selectedTable.SetHeight(height / 2)
+	db.openTable = table
 }
 
-func (db OpenDatabase) openTable(tableName string) (table.Model, error) {
-	tableData, err := db.params.SelectAll(tableName)
+// func (db OpenDatabase) openTable(tableName string) (Table, error) {
+// 	return db.params.SelectAll(tableName)
 
-	if err != nil {
-		return db.selectedTable, err
-	}
+// 	// if err != nil {
+// 	// 	return Table{}, err
+// 	// }
 
-	max_len := db.selectedTable.Width() / len(tableData.fields)
-	columns := make([]table.Column, len(tableData.fields))
-	for i, field := range tableData.fields {
-		columns[i] = table.Column{Title: field, Width: max_len}
-	}
-
-	rows := make([]table.Row, len(tableData.values))
-	for i, value := range tableData.values {
-		rows[i] = make(table.Row, len(value))
-		copy(rows[i], value)
-	}
-
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithFocused(true),
-	)
-
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(false)
-	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	t.SetStyles(s)
-
-	return t, nil
-}
+// 	// return tableData, nil
+// }
 
 func (db OpenDatabase) Init() tea.Cmd {
 	return nil
@@ -179,9 +151,9 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 
 	switch db.viewMode {
 	case TABLES:
-		db.tables, cmd = db.tables.Update(msg)
+		// db.tables, cmd = db.tables.Update(msg)
 	case OPEN:
-		db.selectedTable, cmd = db.selectedTable.Update(msg)
+		// db.selectedTable, cmd = db.selectedTable.Update(msg)
 	}
 
 	return db, cmd
@@ -190,20 +162,20 @@ func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
 func (db OpenDatabase) View() string {
 	s := fmt.Sprintf("%s / %s\n\n", db.params.Name, db.params.Database)
 
-	tableLabels := db.tables.View()
+	// tableLabels := db.tables.View()
 
-	db.setOpenTable()
-	openTable := db.selectedTable.View()
+	// db.setOpenTable()
+	// openTable := db.selectedTable.View()
 
-	if db.viewMode == TABLES {
-		s += lipgloss.JoinHorizontal(lipgloss.Top,
-			focusedModelSideBarStyle.Render(tableLabels),
-			modelStyle.Render(openTable))
-	} else {
-		s += lipgloss.JoinHorizontal(lipgloss.Top,
-			modelStyle.Render(tableLabels),
-			focusedModelStyle.Render(openTable))
-	}
+	// if db.viewMode == TABLES {
+	// 	s += lipgloss.JoinHorizontal(lipgloss.Top,
+	// 		focusedModelSideBarStyle.Render(tableLabels),
+	// 		modelStyle.Render(openTable))
+	// } else {
+	// 	s += lipgloss.JoinHorizontal(lipgloss.Top,
+	// 		modelStyle.Render(tableLabels),
+	// 		focusedModelStyle.Render(openTable))
+	// }
 
 	return paginationStyle.Render(s)
 }
