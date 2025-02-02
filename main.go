@@ -2,17 +2,9 @@ package main
 
 import (
 	"fmt"
-	"io"
-
-	// "log"
-	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
-
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type CurrentView string
@@ -50,161 +42,95 @@ const (
 	LIGHT_GREY = "244"
 )
 
-var (
-	titleStyle      = lipgloss.NewStyle()
-	itemStyle       = lipgloss.NewStyle().PaddingLeft(4)
-	paginationStyle = list.DefaultStyles().PaginationStyle.PaddingLeft(4)
-	quitTextStyle   = lipgloss.NewStyle().Margin(1, 0, 2, 0)
-	helpStyle       = blurredStyle.Copy().PaddingLeft(2)
-	cursorStyle     = focusedItemStyle.Copy()
-	noStyle         = lipgloss.NewStyle()
+// type model struct {
+// 	list                list.Model
+// 	newConnectionModel  NewConnectionModel
+// 	currentView         CurrentView
+// 	currentConnection   Connection
+// 	openDatabase        OpenDatabase
+// 	existingConnections ExistingConnectionsModel
+// }
 
-	selectedItemStyle = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color(MAGENTA))
-	focusedItemStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(RED))
-	focusedStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(WHITE))
-	blurredStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(GREY))
-	successStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(GREEN))
-	errorStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color(RED))
+// func (m model) updateEvents(msg tea.Msg) (model, tea.Cmd) {
+// 	switch msg := msg.(type) {
+// 	case tea.WindowSizeMsg:
+// 		m.list.SetWidth(msg.Width)
+// 		width = msg.Width
+// 		height = msg.Height
+// 		return m, nil
 
-	width  int = 100
-	height int = 100
-)
+// 	case tea.KeyMsg:
+// 		switch keypress := msg.String(); keypress {
+// 		case "q", "ctrl+c":
+// 			return m, tea.Quit
 
-type item string
+// 		case "enter":
+// 			i, ok := m.list.SelectedItem().(item)
+// 			if ok {
+// 				switch string(i) {
+// 				case "New Connection":
+// 					m.currentView = NEW_CONNECTION
+// 					m.newConnectionModel =
+// 						InitialNewConnectionModel()
+// 				case "Edit Connection":
+// 					m.currentView = EDIT_CONNECTION
+// 				case "Join Existing":
+// 					m.currentView = JOIN_EXISTING
+// 					m.existingConnections = NewExistingConnectionsModel()
+// 				}
+// 			}
+// 			return m, nil
+// 		}
+// 	}
 
-func (i item) FilterValue() string { return "" }
+// 	var cmd tea.Cmd
+// 	m.list, cmd = m.list.Update(msg)
+// 	return m, cmd
+// }
 
-type itemDelegate struct{}
+// func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// 	var cmd tea.Cmd
 
-func (d itemDelegate) Height() int                             { return 1 }
-func (d itemDelegate) Spacing() int                            { return 0 }
-func (d itemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
-func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
-	i, ok := listItem.(item)
-	if !ok {
-		return
-	}
+// 	switch m.currentView {
+// 	case NEW_CONNECTION:
+// 		m.newConnectionModel, cmd = m.newConnectionModel.Update(msg)
+// 		if m.newConnectionModel.connection.status == CONNECTED {
+// 			m.currentView = DATABASE_VIEW
+// 			m.currentConnection = m.newConnectionModel.connection
+// 			m.openDatabase = NewOpenDatabase(m.currentConnection)
 
-	str := fmt.Sprintf("%d. %s", index+1, i)
+// 			SaveConnectionInKeyring(m.currentConnection)
+// 		}
 
-	fn := itemStyle.Render
-	if index == m.Index() {
-		fn = func(s ...string) string {
-			return selectedItemStyle.Render("> " + strings.Join(s, " "))
-		}
-	}
+// 		if m.newConnectionModel.action == CANCEL {
+// 			m.currentView = DEFAULT
+// 		}
 
-	fmt.Fprint(w, fn(str))
-}
+// 	case DATABASE_VIEW:
+// 		m.openDatabase, cmd = m.openDatabase.Update(msg)
+// 		if m.openDatabase.viewMode == QUIT {
+// 			m.currentView = DEFAULT
+// 			m.openDatabase = OpenDatabase{}
+// 		}
 
-type model struct {
-	list                list.Model
-	newConnectionModel  NewConnectionModel
-	currentView         CurrentView
-	currentConnection   Connection
-	openDatabase        OpenDatabase
-	existingConnections ExistingConnectionsModel
-}
+// 	case JOIN_EXISTING:
+// 		m.existingConnections, cmd = m.existingConnections.Update(msg)
+// 		if m.existingConnections.selectedConnection != nil {
+// 			m.currentView = DATABASE_VIEW
+// 			m.currentConnection = *m.existingConnections.selectedConnection
+// 			m.openDatabase = NewOpenDatabase(m.currentConnection)
+// 		}
 
-func (m model) updateEvents(msg tea.Msg) (model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.list.SetWidth(msg.Width)
-		width = msg.Width
-		height = msg.Height
-		return m, nil
+// 		if m.existingConnections.back {
+// 			m.currentView = DEFAULT
+// 		}
 
-	case tea.KeyMsg:
-		switch keypress := msg.String(); keypress {
-		case "q", "ctrl+c":
-			return m, tea.Quit
+// 	case DEFAULT, EDIT_CONNECTION:
+// 		m, cmd = m.updateEvents(msg)
+// 	}
 
-		case "enter":
-			i, ok := m.list.SelectedItem().(item)
-			if ok {
-				switch string(i) {
-				case "New Connection":
-					m.currentView = NEW_CONNECTION
-					m.newConnectionModel =
-						InitialNewConnectionModel()
-				case "Edit Connection":
-					m.currentView = EDIT_CONNECTION
-				case "Join Existing":
-					m.currentView = JOIN_EXISTING
-					m.existingConnections = NewExistingConnectionsModel()
-				}
-			}
-			return m, nil
-		}
-	}
-
-	var cmd tea.Cmd
-	m.list, cmd = m.list.Update(msg)
-	return m, cmd
-}
-
-func (m model) Init() tea.Cmd {
-	return nil
-}
-
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch m.currentView {
-	case NEW_CONNECTION:
-		m.newConnectionModel, cmd = m.newConnectionModel.Update(msg)
-		if m.newConnectionModel.connection.status == CONNECTED {
-			m.currentView = DATABASE_VIEW
-			m.currentConnection = m.newConnectionModel.connection
-			m.openDatabase = NewOpenDatabase(m.currentConnection)
-
-			SaveConnectionInKeyring(m.currentConnection)
-		}
-
-		if m.newConnectionModel.action == CANCEL {
-			m.currentView = DEFAULT
-		}
-
-	case DATABASE_VIEW:
-		m.openDatabase, cmd = m.openDatabase.Update(msg)
-		if m.openDatabase.viewMode == QUIT {
-			m.currentView = DEFAULT
-			m.openDatabase = OpenDatabase{}
-		}
-
-	case JOIN_EXISTING:
-		m.existingConnections, cmd = m.existingConnections.Update(msg)
-		if m.existingConnections.selectedConnection != nil {
-			m.currentView = DATABASE_VIEW
-			m.currentConnection = *m.existingConnections.selectedConnection
-			m.openDatabase = NewOpenDatabase(m.currentConnection)
-		}
-
-		if m.existingConnections.back {
-			m.currentView = DEFAULT
-		}
-
-	case DEFAULT, EDIT_CONNECTION:
-		m, cmd = m.updateEvents(msg)
-	}
-
-	return m, cmd
-}
-
-func (m model) View() string {
-	switch m.currentView {
-	case NEW_CONNECTION:
-		return quitTextStyle.Render(m.newConnectionModel.View())
-	case EDIT_CONNECTION:
-		return quitTextStyle.Render("Edit Connection")
-	case JOIN_EXISTING:
-		return quitTextStyle.Render(m.existingConnections.View())
-	case DATABASE_VIEW:
-		return quitTextStyle.Render(m.openDatabase.View())
-	default:
-		return "\n" + m.list.View()
-	}
-}
+// 	return m, cmd
+// }
 
 type HotKey struct {
 	desc     string
@@ -251,7 +177,7 @@ func currentConnectionInfo() *tview.List {
 		AddItem("Name: ", "", 0, nil).
 		AddItem("Host: ", "", 0, nil).
 		AddItem("PORT: ", "", 0, nil).
-		AddItem("USER: ", "Press to exit", 0, nil).
+		AddItem("USER: ", "", 0, nil).
 		AddItem("Database: ", "", 0, nil)
 
 	return list
@@ -430,6 +356,7 @@ func main() {
 
 	hotkeyView := NewHotkeys().
 		AddHotKey("New Connection", 'n').
+		AddHotKey("Edit Connection", 'e').
 		AddHotKey("Quit", 'q')
 	header := header(hotkeyView)
 
@@ -475,9 +402,7 @@ func main() {
 				dbContent := newContentBox(db.openTable.name, dbTable)
 				contentPages.AddAndSwitchToPage(DATABASE_VIEW, dbContent, true)
 			}
-
 		default:
-
 		}
 
 		return event
@@ -487,24 +412,4 @@ func main() {
 	if err := app.SetRoot(mainPages, true).SetFocus(contentPages).Run(); err != nil {
 		panic(err)
 	}
-
-	// items := []list.Item{
-	// 	item("New Connection"),
-	// 	item("Edit Connection"),
-	// 	item("Join Existing"),
-	// }
-
-	// l := list.New(items, itemDelegate{}, defaultWidth, listHeight)
-	// l.Title = "Welcome to TermTable"
-	// l.SetShowStatusBar(false)
-	// l.SetFilteringEnabled(false)
-	// l.Styles.Title = titleStyle
-	// l.Styles.PaginationStyle = paginationStyle
-	// l.Styles.HelpStyle = helpStyle
-
-	// m := model{list: l, currentView: DEFAULT}
-
-	// if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
-	// 	log.Fatal("Error running program:", err)
-	// }
 }
