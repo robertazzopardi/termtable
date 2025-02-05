@@ -26,11 +26,6 @@ const (
 	// DATABASE_VIEW   CurrentView = "DATABASE_VIEW"
 )
 
-const (
-	defaultWidth = 20
-	listHeight   = 14
-)
-
 // Primary ansi colours
 const (
 	WHITE      = "15"
@@ -171,21 +166,21 @@ func (r *HotKeys) Draw(screen tcell.Screen) {
 	}
 }
 
-func currentConnectionInfo() *tview.List {
+func currentConnectionInfo(conn Connection) *tview.List {
 	list := tview.NewList().
 		ShowSecondaryText(false).
 		SetSelectedFocusOnly(true).
-		AddItem("Name: ", "", 0, nil).
-		AddItem("Host: ", "", 0, nil).
-		AddItem("PORT: ", "", 0, nil).
-		AddItem("USER: ", "", 0, nil).
-		AddItem("Database: ", "", 0, nil)
+		AddItem(fmt.Sprintf("Name: %s", conn.Name), "", 0, nil).
+		AddItem(fmt.Sprintf("Host: %s", conn.Host), "", 0, nil).
+		AddItem(fmt.Sprintf("PORT: %s", conn.Port), "", 0, nil).
+		AddItem(fmt.Sprintf("USER: %s", conn.User), "", 0, nil).
+		AddItem(fmt.Sprintf("Database: %s", conn.Database), "", 0, nil)
 
 	return list
 }
 
-func headerPanel(hotkeys *tview.Pages) *tview.Flex {
-	connection := currentConnectionInfo()
+func headerPanel(conn Connection, hotkeys *tview.Pages) *tview.Flex {
+	connection := currentConnectionInfo(conn)
 
 	appName := tview.NewTextView().SetText(APP_NAME).SetTextAlign(tview.AlignRight)
 
@@ -362,8 +357,8 @@ type Layout struct {
 	content *tview.Pages
 }
 
-func newLayout(header *tview.Flex, content *tview.Pages) Layout {
-	view := tview.NewFlex().SetDirection(tview.FlexRow).
+func newLayout(direction int, header *tview.Flex, content *tview.Pages) Layout {
+	view := tview.NewFlex().SetDirection(direction).
 		AddItem(header, 0, 1, false).
 		AddItem(content, 0, 6, false)
 
@@ -378,22 +373,22 @@ func main() {
 		AddHotKey("Edit Connection", 'e').
 		AddHotKey("Quit", 'q')
 	hotkeyPages := tview.NewPages().AddAndSwitchToPage("connectionHotkeys", hotkeyView, true)
-	header := headerPanel(hotkeyPages)
+	header := headerPanel(Connection{}, hotkeyPages)
 
 	connectionsTable := newConnectionsTable(CONNECTION_TABLE_HEADERS)
 	connectionsView := newContentBox("Connections", connectionsTable)
 
 	contentPages := tview.NewPages().
 		AddAndSwitchToPage(SAVED_CONNECTIONS, connectionsView, true)
-	mainView := newLayout(header, contentPages)
+	mainView := newLayout(tview.FlexRow, header, contentPages)
 
 	mainPages := tview.NewPages().
 		AddAndSwitchToPage(MAIN_PAGE, mainView, true)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		pageName, _ := mainPages.GetFrontPage()
-		// contentName, _ := mainView.content.GetFrontPage()
 		currentHotkeys, _ := hotkeyPages.GetFrontPage()
+		contentView, _ := contentPages.GetFrontPage()
 
 		switch currentHotkeys {
 		case "connectionHotkeys":
@@ -431,9 +426,23 @@ func main() {
 
 			switch event.Key() {
 			case tcell.KeyESC:
+				if contentView == DATABASE_VIEW {
+
+					newHeader := newLayout(tview.FlexRow, headerPanel(Connection{}, hotkeyPages), contentPages)
+					mainPages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
+
+					contentPages.RemovePage(DATABASE_VIEW)
+					app.SetFocus(contentPages)
+					return event
+				}
+
 				mainPages.RemovePage(NEW_CONNECTION_FORM)
 				app.SetFocus(contentPages)
 			case tcell.KeyEnter:
+				if contentView == DATABASE_VIEW {
+					return event
+				}
+
 				connection := connectionsTable.getConnection()
 				if connection == nil {
 					return event
@@ -442,7 +451,12 @@ func main() {
 				db := NewOpenDatabase(*connection)
 				dbTable := newDbTable(db.openTable)
 				dbContent := newContentBox(db.openTable.name, dbTable)
+
+				newHeader := newLayout(tview.FlexRow, headerPanel(*connection, hotkeyPages), contentPages)
+				mainPages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
+
 				contentPages.AddAndSwitchToPage(DATABASE_VIEW, dbContent, true)
+				app.SetFocus(contentPages)
 			}
 		default:
 		}
@@ -450,7 +464,6 @@ func main() {
 		return event
 	})
 
-	// TODO somthing with focus is causing the extra border outline
 	if err := app.SetRoot(mainPages, true).SetFocus(contentPages).Run(); err != nil {
 		panic(err)
 	}
