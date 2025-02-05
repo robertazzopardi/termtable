@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/gdamore/tcell/v2"
@@ -204,7 +205,16 @@ func newConnectionForm(conn Connection, escapeFunc func()) *tview.Flex {
 		AddInputField("User", conn.User, 26, nil, func(text string) { conn.User = text }).
 		AddPasswordField("Password", conn.Password, 26, '*', func(text string) { conn.Password = text }).
 		AddInputField("Database", conn.Database, 26, nil, func(text string) { conn.Database = text }).
-		AddButton("Save", nil).
+		AddButton("Save", func() {
+			testResult := conn.TestConnection()
+			if testResult == FAILED {
+				log.Fatal("Could not save connection because connection could not be established")
+			}
+
+			SaveConnectionInKeyring(conn)
+
+			// TODO remove new connection form and refresh connections view
+		}).
 		AddButton("Test", func() {
 			testResult := conn.TestConnection()
 			switch testResult {
@@ -214,6 +224,7 @@ func newConnectionForm(conn Connection, escapeFunc func()) *tview.Flex {
 			}
 		}).
 		AddButton("Connect", func() {
+
 			// TODO save and connect
 		})
 
