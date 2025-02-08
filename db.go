@@ -36,39 +36,41 @@ func (params Connection) ConnectionString() string {
 func (params *Connection) TestConnection() TestStatus {
 	connectionString := params.ConnectionString()
 	conn, err := pgx.Connect(context.Background(), connectionString)
-
 	if err != nil {
 		params.status = DISCONNECTED
+
 		return FAILED
 	}
 
 	conn.Close(context.Background())
 
 	params.status = CONNECTED
+
 	return PASSED
 }
 
 func (parmas Connection) GetTableNames() []string {
 	connectionString := parmas.ConnectionString()
 	conn, err := pgx.Connect(context.Background(), connectionString)
-
 	if err != nil {
 		return nil
 	}
 
 	rows, err := conn.Query(context.Background(), "SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
-
 	if err != nil {
 		return nil
 	}
 
 	var tableNames []string
+
 	for rows.Next() {
 		var tableName string
+
 		err = rows.Scan(&tableName)
 		if err != nil {
 			return nil
 		}
+
 		tableNames = append(tableNames, tableName)
 	}
 
@@ -86,13 +88,11 @@ type Table struct {
 func (params Connection) SelectAll(table string) (Table, error) {
 	connectionString := params.ConnectionString()
 	conn, err := pgx.Connect(context.Background(), connectionString)
-
 	if err != nil {
 		return Table{}, err
 	}
 
-	rows, err := conn.Query(context.Background(), fmt.Sprintf("SELECT * FROM %s", table))
-
+	rows, err := conn.Query(context.Background(), "SELECT * FROM "+table)
 	if err != nil {
 		return Table{}, err
 	}
@@ -101,6 +101,7 @@ func (params Connection) SelectAll(table string) (Table, error) {
 
 	fieldDescriptions := rows.FieldDescriptions()
 	tableData.fields = make([]string, len(fieldDescriptions))
+
 	for i, field := range fieldDescriptions {
 		tableData.fields[i] = field.Name
 	}

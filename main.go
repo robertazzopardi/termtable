@@ -24,10 +24,10 @@ const (
 	NEW_CONNECTION  CurrentView = "NEW_CONNECTION"
 	EDIT_CONNECTION CurrentView = "EDIT_CONNECTION"
 	JOIN_EXISTING   CurrentView = "JOIN_EXISTING"
-	// DATABASE_VIEW   CurrentView = "DATABASE_VIEW"
+	// DATABASE_VIEW   CurrentView = "DATABASE_VIEW".
 )
 
-// Primary ansi colours
+// Primary ansi colours.
 const (
 	WHITE      = "15"
 	RED        = "1"
@@ -142,6 +142,7 @@ type HotKeys struct {
 func NewHotkeys() *HotKeys {
 	list := tview.NewList().
 		ShowSecondaryText(false).SetSelectedFocusOnly(true)
+
 	return &HotKeys{
 		List:   list,
 		values: []HotKey{},
@@ -150,6 +151,7 @@ func NewHotkeys() *HotKeys {
 
 func (r *HotKeys) AddHotKey(desc string, shortcut rune) *HotKeys {
 	r.values = append(r.values, HotKey{desc, shortcut})
+
 	return r
 }
 
@@ -171,11 +173,11 @@ func currentConnectionInfo(conn Connection) *tview.List {
 	list := tview.NewList().
 		ShowSecondaryText(false).
 		SetSelectedFocusOnly(true).
-		AddItem(fmt.Sprintf("Name: %s", conn.Name), "", 0, nil).
-		AddItem(fmt.Sprintf("Host: %s", conn.Host), "", 0, nil).
-		AddItem(fmt.Sprintf("PORT: %s", conn.Port), "", 0, nil).
-		AddItem(fmt.Sprintf("USER: %s", conn.User), "", 0, nil).
-		AddItem(fmt.Sprintf("Database: %s", conn.Database), "", 0, nil)
+		AddItem("Name: "+conn.Name, "", 0, nil).
+		AddItem("Host: "+conn.Host, "", 0, nil).
+		AddItem("PORT: "+conn.Port, "", 0, nil).
+		AddItem("USER: "+conn.User, "", 0, nil).
+		AddItem("Database: "+conn.Database, "", 0, nil)
 
 	return list
 }
@@ -200,6 +202,7 @@ func newConnectionForm(conn Connection, escapeFunc func()) *tview.Flex {
 		AddInputField("Host", conn.Host, 26, nil, func(text string) { conn.Host = text }).
 		AddInputField("Port", conn.Port, 26, func(textToCheck string, lastChar rune) bool {
 			_, err := strconv.Atoi(textToCheck)
+
 			return err == nil
 		}, func(text string) { conn.Port = text }).
 		AddInputField("User", conn.User, 26, nil, func(text string) { conn.User = text }).
@@ -224,7 +227,6 @@ func newConnectionForm(conn Connection, escapeFunc func()) *tview.Flex {
 			}
 		}).
 		AddButton("Connect", func() {
-
 			// TODO save and connect
 		})
 
@@ -243,6 +245,7 @@ func newConnectionForm(conn Connection, escapeFunc func()) *tview.Flex {
 		if event.Key() == tcell.KeyESC {
 			escapeFunc()
 		}
+
 		return event
 	})
 
@@ -282,7 +285,6 @@ func newConnectionsTable(columns []string) *DisplayTable {
 
 func (t *DisplayTable) getConnections() {
 	connections, err := ListConnections()
-
 	if err != nil {
 		return
 	}
@@ -429,6 +431,7 @@ func newApp() App {
 					app.SetFocus(contentPages)
 				})
 				pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
+
 				return nil
 			case 'e':
 				connection := connectionsTable.getConnection()
@@ -441,18 +444,19 @@ func newApp() App {
 					app.SetFocus(contentPages)
 				})
 				pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
+
 				return nil
 			}
 
 			switch event.Key() {
 			case tcell.KeyESC:
 				if contentView == DATABASE_VIEW {
-
 					newHeader := newLayout(tview.FlexRow, headerPanel(Connection{}, hotkeyPages), contentPages)
 					pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
 
 					contentPages.RemovePage(DATABASE_VIEW)
 					app.SetFocus(contentPages)
+
 					return event
 				}
 

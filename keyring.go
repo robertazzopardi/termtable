@@ -20,15 +20,14 @@ const (
 
 func getAndOrCreateLocalDb() (string, error) {
 	homeDir, err := os.UserHomeDir()
-
 	if err != nil {
 		return "", errors.New("Could not get home directory")
 	}
 
-	localDb := fmt.Sprintf("%s/.termtable/connections.db", homeDir)
+	localDb := homeDir + "/.termtable/connections.db"
 
 	if _, err := os.Stat(localDb); os.IsNotExist(err) {
-		err := os.Mkdir(filepath.Dir(localDb), 0755)
+		err := os.Mkdir(filepath.Dir(localDb), 0o755)
 		if err != nil {
 			log.Fatal("Could not create directory to store local db: ", err)
 		}
@@ -43,6 +42,7 @@ func createBucket(db *bolt.DB) error {
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		err = tx.Rollback()
 	}()
@@ -63,12 +63,11 @@ func createBucket(db *bolt.DB) error {
 
 func updateLocalDbConn(conn Connection) error {
 	localDb, err := getAndOrCreateLocalDb()
-
 	if err != nil {
 		return err
 	}
 
-	db, err := bolt.Open(localDb, 0600, nil)
+	db, err := bolt.Open(localDb, 0o600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -82,6 +81,7 @@ func updateLocalDbConn(conn Connection) error {
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
 		err := b.Put([]byte(conn.Name), []byte(fmt.Sprintf("%s:%s:%s", conn.Host, conn.Port, conn.Database)))
+
 		return err
 	})
 
@@ -90,12 +90,11 @@ func updateLocalDbConn(conn Connection) error {
 
 func deleteLocalDbConn(name string) error {
 	localDb, err := getAndOrCreateLocalDb()
-
 	if err != nil {
 		return err
 	}
 
-	db, err := bolt.Open(localDb, 0600, nil)
+	db, err := bolt.Open(localDb, 0o600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -109,6 +108,7 @@ func deleteLocalDbConn(name string) error {
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(LOCAL_BUCKET_NAME))
 		err := b.Delete([]byte(name))
+
 		return err
 	})
 
@@ -124,7 +124,7 @@ func listLocalDbConn() (map[string]string, error) {
 		return connections, err
 	}
 
-	db, err := bolt.Open(localDb, 0600, nil)
+	db, err := bolt.Open(localDb, 0o600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -170,14 +170,12 @@ func SaveConnectionInKeyring(conn Connection) {
 	// Save keyring part
 	password := createKeyringPassword(conn.User, conn.Password)
 	err := keyring.Set(SERVICE, conn.Name, password)
-
 	if err != nil {
 		log.Fatal("Could not save db credentials in keyring: ", err)
 	}
 
 	// Save rest to local storage
 	err = updateLocalDbConn(conn)
-
 	if err != nil {
 		log.Fatal("Could not set keyring info into local db: ", err)
 	}
@@ -185,7 +183,6 @@ func SaveConnectionInKeyring(conn Connection) {
 
 func GetConnectionFromKeyring(name string) (string, string, error) {
 	password, err := keyring.Get(SERVICE, name)
-
 	if err != nil {
 		log.Fatal("Could not get credentials for connection: ", err)
 	}

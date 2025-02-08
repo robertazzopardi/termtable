@@ -37,9 +37,9 @@ func (db *OpenDatabase) setOpenTable() {
 	tableName := db.tables[0]
 
 	table, err := db.params.SelectAll(tableName)
-
 	if err != nil {
 		log.Fatal("Could not connect to db", err)
+
 		return
 	}
 
