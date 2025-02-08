@@ -376,7 +376,14 @@ func newLayout(direction int, header *tview.Flex, content *tview.Pages) Layout {
 	return Layout{view, header, content}
 }
 
-func main() {
+type App struct {
+	*tview.Application
+	conn  Connection
+	pages *tview.Pages
+	// views
+}
+
+func newApp() App {
 	app := tview.NewApplication()
 
 	hotkeyView := NewHotkeys().
@@ -393,11 +400,13 @@ func main() {
 		AddAndSwitchToPage(SAVED_CONNECTIONS, connectionsView, true)
 	mainView := newLayout(tview.FlexRow, header, contentPages)
 
-	mainPages := tview.NewPages().
+	pages := tview.NewPages().
 		AddAndSwitchToPage(MAIN_PAGE, mainView, true)
 
+	app.SetRoot(pages, true).SetFocus(contentPages)
+
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		pageName, _ := mainPages.GetFrontPage()
+		pageName, _ := pages.GetFrontPage()
 		currentHotkeys, _ := hotkeyPages.GetFrontPage()
 		contentView, _ := contentPages.GetFrontPage()
 
@@ -416,10 +425,10 @@ func main() {
 				}
 
 				addConnectionForm := newConnectionForm(Connection{}, func() {
-					mainPages.RemovePage(NEW_CONNECTION_FORM)
+					pages.RemovePage(NEW_CONNECTION_FORM)
 					app.SetFocus(contentPages)
 				})
-				mainPages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
+				pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
 				return nil
 			case 'e':
 				connection := connectionsTable.getConnection()
@@ -428,10 +437,10 @@ func main() {
 				}
 
 				addConnectionForm := newConnectionForm(*connection, func() {
-					mainPages.RemovePage(NEW_CONNECTION_FORM)
+					pages.RemovePage(NEW_CONNECTION_FORM)
 					app.SetFocus(contentPages)
 				})
-				mainPages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
+				pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
 				return nil
 			}
 
@@ -440,14 +449,14 @@ func main() {
 				if contentView == DATABASE_VIEW {
 
 					newHeader := newLayout(tview.FlexRow, headerPanel(Connection{}, hotkeyPages), contentPages)
-					mainPages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
+					pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
 
 					contentPages.RemovePage(DATABASE_VIEW)
 					app.SetFocus(contentPages)
 					return event
 				}
 
-				mainPages.RemovePage(NEW_CONNECTION_FORM)
+				pages.RemovePage(NEW_CONNECTION_FORM)
 				app.SetFocus(contentPages)
 			case tcell.KeyEnter:
 				if contentView == DATABASE_VIEW {
@@ -464,7 +473,7 @@ func main() {
 				dbContent := newContentBox(db.openTable.name, dbTable)
 
 				newHeader := newLayout(tview.FlexRow, headerPanel(*connection, hotkeyPages), contentPages)
-				mainPages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
+				pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
 
 				contentPages.AddAndSwitchToPage(DATABASE_VIEW, dbContent, true)
 				app.SetFocus(contentPages)
@@ -475,7 +484,13 @@ func main() {
 		return event
 	})
 
-	if err := app.SetRoot(mainPages, true).SetFocus(contentPages).Run(); err != nil {
+	return App{app, Connection{}, pages}
+}
+
+func main() {
+	app := newApp()
+
+	if err := app.Run(); err != nil {
 		panic(err)
 	}
 }
