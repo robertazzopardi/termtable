@@ -58,7 +58,7 @@ func initDb(db *sql.DB) error {
 	return err
 }
 
-func updateLocalDbConn(conn Connection) error {
+func updateConnection(conn Connection) error {
 	localDb, err := getAndOrCreateLocalDb()
 	if err != nil {
 		return err
@@ -84,7 +84,7 @@ func updateLocalDbConn(conn Connection) error {
 	return err
 }
 
-func deleteLocalDbConn(name string) error {
+func DeleteConnection(name string) error {
 	localDb, err := getAndOrCreateLocalDb()
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func deleteLocalDbConn(name string) error {
 	return err
 }
 
-func listLocalDbConn() (map[string]string, error) {
+func listConnections() (map[string]string, error) {
 	connections := make(map[string]string)
 	localDb, err := getAndOrCreateLocalDb()
 
@@ -164,7 +164,7 @@ func SaveConnectionInKeyring(conn Connection) {
 	}
 
 	// Save rest to local storage
-	err = updateLocalDbConn(conn)
+	err = updateConnection(conn)
 	if err != nil {
 		log.Fatal("Could not set keyring info into local db: ", err)
 	}
@@ -180,7 +180,7 @@ func GetConnectionFromKeyring(name string) (string, string, error) {
 }
 
 func ListConnections() ([]Connection, error) {
-	connections, err := listLocalDbConn()
+	connections, err := listConnections()
 
 	var conns []Connection
 

@@ -228,7 +228,6 @@ func newConnectionForm(app *App, conn Connection, escapeFunc func()) *tview.Flex
 			}
 		}).
 		AddButton("Connect", func() {
-			// Test save open
 			testResult := conn.TestConnection()
 			if testResult == FAILED {
 				log.Fatal("Could not connect because connection could not be established")
@@ -404,6 +403,7 @@ func newApp() App {
 	hotkeyView := NewHotkeys().
 		AddHotKey("New Connection", 'n').
 		AddHotKey("Edit Connection", 'e').
+		AddHotKey("Delete Connection", 'd').
 		AddHotKey("Quit", 'q')
 	hotkeys := tview.NewPages().
 		AddAndSwitchToPage("connectionHotkeys", hotkeyView, true)
@@ -467,6 +467,34 @@ func (app *App) setInputHandler() {
 				app.pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
 
 				return nil
+			case 'd':
+				// Delete connection
+				connection := app.connections.getConnection()
+				if connection == nil {
+					return event
+				}
+
+				confirmDeleteModal := tview.NewModal().
+					SetText("Are you sure you want to delete: " + connection.Name + "?").
+					AddButtons([]string{"Cancel", "Confirm"}).
+					SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+						if buttonLabel == "Confirm" {
+							err := DeleteConnection(connection.Name)
+							if err != nil {
+								log.Fatal("Could not delete connection", err)
+							}
+
+							connectionsTable := newConnectionsTable(CONNECTION_TABLE_HEADERS)
+							connectionsView := newContentBox("Connections", connectionsTable)
+
+							app.content.AddPage(SAVED_CONNECTIONS, connectionsView, true, true)
+						}
+
+						app.pages.RemovePage("ConfirmDelete")
+						app.SetFocus(app.content)
+					})
+				app.pages.AddPage("ConfirmDelete", confirmDeleteModal, true, true)
+				return nil
 			}
 
 			switch event.Key() {
@@ -484,7 +512,7 @@ func (app *App) setInputHandler() {
 				app.pages.RemovePage(NEW_CONNECTION_FORM)
 				app.SetFocus(app.content)
 			case tcell.KeyEnter:
-				if contentView == DATABASE_VIEW {
+				if contentView == DATABASE_VIEW || pageName == "ConfirmDelete" {
 					return event
 				}
 
