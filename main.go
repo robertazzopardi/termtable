@@ -196,7 +196,7 @@ func headerPanel(conn Connection, hotkeys *tview.Pages) *tview.Flex {
 	return headerView
 }
 
-func newConnectionForm(conn Connection, escapeFunc func()) *tview.Flex {
+func newConnectionForm(app *App, conn Connection, escapeFunc func()) *tview.Flex {
 	form := tview.NewForm().
 		AddInputField("Name", conn.Name, 26, nil, func(text string) { conn.Name = text }).
 		AddInputField("Host", conn.Host, 26, nil, func(text string) { conn.Host = text }).
@@ -216,6 +216,7 @@ func newConnectionForm(conn Connection, escapeFunc func()) *tview.Flex {
 
 			SaveConnectionInKeyring(conn)
 
+			escapeFunc()
 			// TODO remove new connection form and refresh connections view
 		}).
 		AddButton("Test", func() {
@@ -227,7 +228,17 @@ func newConnectionForm(conn Connection, escapeFunc func()) *tview.Flex {
 			}
 		}).
 		AddButton("Connect", func() {
-			// TODO save and connect
+			// Test save open
+			testResult := conn.TestConnection()
+			if testResult == FAILED {
+				log.Fatal("Could not connect because connection could not be established")
+			}
+
+			SaveConnectionInKeyring(conn)
+
+			escapeFunc()
+
+			app.openConnection(conn)
 		})
 
 	form.SetBorder(true)
@@ -380,9 +391,11 @@ func newLayout(direction int, header *tview.Flex, content *tview.Pages) Layout {
 
 type App struct {
 	*tview.Application
-	conn  Connection
-	pages *tview.Pages
-	// views
+	conn        Connection
+	pages       *tview.Pages
+	content     *tview.Pages
+	hotkeys     *tview.Pages
+	connections *DisplayTable
 }
 
 func newApp() App {
@@ -392,25 +405,33 @@ func newApp() App {
 		AddHotKey("New Connection", 'n').
 		AddHotKey("Edit Connection", 'e').
 		AddHotKey("Quit", 'q')
-	hotkeyPages := tview.NewPages().AddAndSwitchToPage("connectionHotkeys", hotkeyView, true)
-	header := headerPanel(Connection{}, hotkeyPages)
+	hotkeys := tview.NewPages().
+		AddAndSwitchToPage("connectionHotkeys", hotkeyView, true)
+	header := headerPanel(Connection{}, hotkeys)
 
 	connectionsTable := newConnectionsTable(CONNECTION_TABLE_HEADERS)
 	connectionsView := newContentBox("Connections", connectionsTable)
 
-	contentPages := tview.NewPages().
+	content := tview.NewPages().
 		AddAndSwitchToPage(SAVED_CONNECTIONS, connectionsView, true)
-	mainView := newLayout(tview.FlexRow, header, contentPages)
+	mainView := newLayout(tview.FlexRow, header, content)
 
 	pages := tview.NewPages().
 		AddAndSwitchToPage(MAIN_PAGE, mainView, true)
 
-	app.SetRoot(pages, true).SetFocus(contentPages)
+	app.SetRoot(pages, true).SetFocus(content)
 
+	ctx := App{app, Connection{}, pages, content, hotkeys, connectionsTable}
+	ctx.setInputHandler()
+
+	return ctx
+}
+
+func (app *App) setInputHandler() {
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		pageName, _ := pages.GetFrontPage()
-		currentHotkeys, _ := hotkeyPages.GetFrontPage()
-		contentView, _ := contentPages.GetFrontPage()
+		pageName, _ := app.pages.GetFrontPage()
+		currentHotkeys, _ := app.hotkeys.GetFrontPage()
+		contentView, _ := app.content.GetFrontPage()
 
 		switch currentHotkeys {
 		case "connectionHotkeys":
@@ -426,24 +447,24 @@ func newApp() App {
 					return event
 				}
 
-				addConnectionForm := newConnectionForm(Connection{}, func() {
-					pages.RemovePage(NEW_CONNECTION_FORM)
-					app.SetFocus(contentPages)
+				addConnectionForm := newConnectionForm(app, Connection{}, func() {
+					app.pages.RemovePage(NEW_CONNECTION_FORM)
+					app.SetFocus(app.content)
 				})
-				pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
+				app.pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
 
 				return nil
 			case 'e':
-				connection := connectionsTable.getConnection()
+				connection := app.connections.getConnection()
 				if connection == nil {
 					return event
 				}
 
-				addConnectionForm := newConnectionForm(*connection, func() {
-					pages.RemovePage(NEW_CONNECTION_FORM)
-					app.SetFocus(contentPages)
+				addConnectionForm := newConnectionForm(app, *connection, func() {
+					app.pages.RemovePage(NEW_CONNECTION_FORM)
+					app.SetFocus(app.content)
 				})
-				pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
+				app.pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
 
 				return nil
 			}
@@ -451,44 +472,46 @@ func newApp() App {
 			switch event.Key() {
 			case tcell.KeyESC:
 				if contentView == DATABASE_VIEW {
-					newHeader := newLayout(tview.FlexRow, headerPanel(Connection{}, hotkeyPages), contentPages)
-					pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
+					newHeader := newLayout(tview.FlexRow, headerPanel(Connection{}, app.hotkeys), app.content)
+					app.pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
 
-					contentPages.RemovePage(DATABASE_VIEW)
-					app.SetFocus(contentPages)
+					app.content.RemovePage(DATABASE_VIEW)
+					app.SetFocus(app.content)
 
 					return event
 				}
 
-				pages.RemovePage(NEW_CONNECTION_FORM)
-				app.SetFocus(contentPages)
+				app.pages.RemovePage(NEW_CONNECTION_FORM)
+				app.SetFocus(app.content)
 			case tcell.KeyEnter:
 				if contentView == DATABASE_VIEW {
 					return event
 				}
 
-				connection := connectionsTable.getConnection()
+				connection := app.connections.getConnection()
 				if connection == nil {
 					return event
 				}
 
-				db := NewOpenDatabase(*connection)
-				dbTable := newDbTable(db.openTable)
-				dbContent := newContentBox(db.openTable.name, dbTable)
-
-				newHeader := newLayout(tview.FlexRow, headerPanel(*connection, hotkeyPages), contentPages)
-				pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
-
-				contentPages.AddAndSwitchToPage(DATABASE_VIEW, dbContent, true)
-				app.SetFocus(contentPages)
+				app.openConnection(*connection)
 			}
 		default:
 		}
 
 		return event
 	})
+}
 
-	return App{app, Connection{}, pages}
+func (app App) openConnection(connection Connection) {
+	db := NewOpenDatabase(connection)
+	dbTable := newDbTable(db.openTable)
+	dbContent := newContentBox(db.openTable.name, dbTable)
+
+	newHeader := newLayout(tview.FlexRow, headerPanel(connection, app.hotkeys), app.content)
+	app.pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
+
+	app.content.AddAndSwitchToPage(DATABASE_VIEW, dbContent, true)
+	app.SetFocus(app.content)
 }
 
 func main() {
