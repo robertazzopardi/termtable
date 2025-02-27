@@ -217,7 +217,8 @@ func newConnectionForm(app *App, conn Connection, escapeFunc func()) *tview.Flex
 			SaveConnectionInKeyring(conn)
 
 			escapeFunc()
-			// TODO remove new connection form and refresh connections view
+
+			app.refreshConnections()
 		}).
 		AddButton("Test", func() {
 			testResult := conn.TestConnection()
@@ -236,6 +237,8 @@ func newConnectionForm(app *App, conn Connection, escapeFunc func()) *tview.Flex
 			SaveConnectionInKeyring(conn)
 
 			escapeFunc()
+
+			app.refreshConnections()
 
 			app.openConnection(conn)
 		})
@@ -409,11 +412,7 @@ func newApp() App {
 		AddAndSwitchToPage("connectionHotkeys", hotkeyView, true)
 	header := headerPanel(Connection{}, hotkeys)
 
-	connectionsTable := newConnectionsTable(CONNECTION_TABLE_HEADERS)
-	connectionsView := newContentBox("Connections", connectionsTable)
-
-	content := tview.NewPages().
-		AddAndSwitchToPage(SAVED_CONNECTIONS, connectionsView, true)
+	content := tview.NewPages()
 	mainView := newLayout(tview.FlexRow, header, content)
 
 	pages := tview.NewPages().
@@ -421,10 +420,18 @@ func newApp() App {
 
 	app.SetRoot(pages, true).SetFocus(content)
 
-	ctx := App{app, Connection{}, pages, content, hotkeys, connectionsTable}
+	ctx := App{app, Connection{}, pages, content, hotkeys, &DisplayTable{}}
 	ctx.setInputHandler()
+	ctx.refreshConnections()
 
 	return ctx
+}
+
+func (app *App) refreshConnections() {
+	connectionsTable := newConnectionsTable(CONNECTION_TABLE_HEADERS)
+	connectionsView := newContentBox("Connections", connectionsTable)
+	app.content.AddPage(SAVED_CONNECTIONS, connectionsView, true, true)
+	app.connections = connectionsTable
 }
 
 func (app *App) setInputHandler() {
@@ -484,10 +491,7 @@ func (app *App) setInputHandler() {
 								log.Fatal("Could not delete connection", err)
 							}
 
-							connectionsTable := newConnectionsTable(CONNECTION_TABLE_HEADERS)
-							connectionsView := newContentBox("Connections", connectionsTable)
-
-							app.content.AddPage(SAVED_CONNECTIONS, connectionsView, true, true)
+							app.refreshConnections()
 						}
 
 						app.pages.RemovePage("ConfirmDelete")
