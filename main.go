@@ -234,8 +234,6 @@ func newConnectionForm(app *App, conn Connection, escapeFunc func()) *tview.Flex
 				log.Fatal("Could not connect because connection could not be established")
 			}
 
-			SaveConnectionInKeyring(conn)
-
 			escapeFunc()
 
 			app.refreshConnections()
@@ -272,7 +270,7 @@ const (
 	DATABASE_VIEW       = "databaseView"
 )
 
-var CONNECTION_TABLE_HEADERS = []string{"NAME", "HOST", "PORT", "USER", "DATABASE"}
+var CONNECTION_TABLE_HEADERS = []string{"ID", "NAME", "HOST", "PORT", "USER", "DATABASE"}
 
 type DisplayTable struct {
 	*tview.Table
@@ -410,7 +408,7 @@ func newApp() App {
 		AddHotKey("Quit", 'q')
 	hotkeys := tview.NewPages().
 		AddAndSwitchToPage("connectionHotkeys", hotkeyView, true)
-	header := headerPanel(Connection{}, hotkeys)
+	header := headerPanel(NewConnection(), hotkeys)
 
 	content := tview.NewPages()
 	mainView := newLayout(tview.FlexRow, header, content)
@@ -420,7 +418,7 @@ func newApp() App {
 
 	app.SetRoot(pages, true).SetFocus(content)
 
-	ctx := App{app, Connection{}, pages, content, hotkeys, &DisplayTable{}}
+	ctx := App{app, NewConnection(), pages, content, hotkeys, &DisplayTable{}}
 	ctx.setInputHandler()
 	ctx.refreshConnections()
 
@@ -454,7 +452,7 @@ func (app *App) setInputHandler() {
 					return event
 				}
 
-				addConnectionForm := newConnectionForm(app, Connection{}, func() {
+				addConnectionForm := newConnectionForm(app, NewConnection(), func() {
 					app.pages.RemovePage(NEW_CONNECTION_FORM)
 					app.SetFocus(app.content)
 				})
@@ -504,7 +502,7 @@ func (app *App) setInputHandler() {
 			switch event.Key() {
 			case tcell.KeyESC:
 				if contentView == DATABASE_VIEW {
-					newHeader := newLayout(tview.FlexRow, headerPanel(Connection{}, app.hotkeys), app.content)
+					newHeader := newLayout(tview.FlexRow, headerPanel(NewConnection(), app.hotkeys), app.content)
 					app.pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
 
 					app.content.RemovePage(DATABASE_VIEW)

@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -15,6 +17,7 @@ const (
 )
 
 type Connection struct {
+	ID       uuid.UUID
 	Host     string
 	Port     string
 	User     string
@@ -24,8 +27,16 @@ type Connection struct {
 	status   ConnectionStatus
 }
 
+func NewConnection() Connection {
+	ID, err := uuid.NewV7()
+	if err != nil {
+		log.Fatal("Could not create id for connection", err)
+	}
+	return Connection{ID: ID}
+}
+
 func (c Connection) Row() []string {
-	return []string{c.Name, c.Host, c.Port, c.User, c.Database}
+	return []string{c.ID.String(), c.Name, c.Host, c.Port, c.User, c.Database}
 }
 
 func (params Connection) ConnectionString() string {

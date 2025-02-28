@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/zalando/go-keyring"
 	_ "modernc.org/sqlite"
 )
@@ -49,7 +50,8 @@ func initDb(db *sql.DB) error {
 	// Create the table if it doesn't exist
 	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS database_connections (
-			name TEXT PRIMARY KEY,
+			id uuid PRIMARY KEY,
+			name TEXT UNIQUE NOT NULL,
 			host TEXT NOT NULL,
 			port TEXT NOT NULL,
 			database_name TEXT NOT NULL
@@ -77,8 +79,8 @@ func updateConnection(conn Connection) error {
 
 	// Insert or replace the connection
 	_, err = db.Exec(
-		"INSERT OR REPLACE INTO database_connections (name, host, port, database_name) VALUES (?, ?, ?, ?)",
-		conn.Name, conn.Host, conn.Port, conn.Database,
+		"INSERT OR REPLACE INTO database_connections (id, name, host, port, database_name) VALUES (?, ?, ?, ?, ?)",
+		conn.ID, conn.Name, conn.Host, conn.Port, conn.Database,
 	)
 
 	return err
@@ -124,18 +126,18 @@ func listConnections() (map[string]string, error) {
 		return connections, err
 	}
 
-	rows, err := db.Query("SELECT name, host, port, database_name FROM database_connections")
+	rows, err := db.Query("SELECT id, name, host, port, database_name FROM database_connections")
 	if err != nil {
 		return connections, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var name, host, port, database string
-		if err := rows.Scan(&name, &host, &port, &database); err != nil {
+		var id, name, host, port, database string
+		if err := rows.Scan(&id, &name, &host, &port, &database); err != nil {
 			log.Fatal(err)
 		}
-		connections[name] = fmt.Sprintf("%s:%s:%s", host, port, database)
+		connections[name] = fmt.Sprintf("%s:%s:%s:%s", id, host, port, database)
 	}
 
 	return connections, rows.Err()
@@ -189,8 +191,8 @@ func ListConnections() ([]Connection, error) {
 	}
 
 	for k, v := range connections {
-		hostPortDb := strings.Split(v, ":")
-		if len(hostPortDb) != 3 {
+		components := strings.Split(v, ":")
+		if len(components) != 4 {
 			continue
 		}
 
@@ -199,13 +201,20 @@ func ListConnections() ([]Connection, error) {
 			log.Fatal("Could not get user and password for db", err)
 		}
 
+		id, err := uuid.Parse(components[0])
+		if err != nil {
+			log.Println(components[0])
+			log.Fatal("Invalid uuid found for connection", err)
+		}
+
 		conn := Connection{
+			ID:       id,
 			Name:     k,
 			User:     user,
 			Password: password,
-			Host:     hostPortDb[0],
-			Port:     hostPortDb[1],
-			Database: hostPortDb[2],
+			Host:     components[1],
+			Port:     components[2],
+			Database: components[3],
 		}
 		conns = append(conns, conn)
 	}

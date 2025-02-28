@@ -4,6 +4,7 @@ go 1.23.4
 
 require (
 	github.com/gdamore/tcell/v2 v2.7.1
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/rivo/tview v0.0.0-20241227133733-17b7edb88c57
 	github.com/zalando/go-keyring v0.2.4
@@ -16,7 +17,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
