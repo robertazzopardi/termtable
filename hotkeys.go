@@ -51,3 +51,20 @@ func (r *HotKeys) Draw(screen tcell.Screen) {
 		tview.Print(screen, line, x, y+index, width, tview.AlignLeft, tcell.ColorYellow)
 	}
 }
+
+// GetConnectionHotkeys returns hotkeys for the connections view
+func GetConnectionHotkeys() *HotKeys {
+	return NewHotkeys().
+		AddHotKey("New Connection", 'n').
+		AddHotKey("Edit Connection", 'e').
+		AddHotKey("Delete Connection", 'd').
+		AddHotKey("Quit", 'q')
+}
+
+// GetDatabaseHotkeys returns hotkeys for the database view
+func GetDatabaseHotkeys() *HotKeys {
+	return NewHotkeys().
+		AddHotKey("Back to Connections", 'b').
+		AddHotKey("Refresh Data", 'r').
+		AddHotKey("Quit", 'q')
+}

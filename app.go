@@ -19,13 +19,14 @@ type App struct {
 func NewApp() App {
 	app := tview.NewApplication()
 
-	hotkeyView := NewHotkeys().
-		AddHotKey("New Connection", 'n').
-		AddHotKey("Edit Connection", 'e').
-		AddHotKey("Delete Connection", 'd').
-		AddHotKey("Quit", 'q')
+	// Create pages for different hotkey sets
+	connectionHotkeys := GetConnectionHotkeys()
+	databaseHotkeys := GetDatabaseHotkeys()
+
 	hotkeys := tview.NewPages().
-		AddAndSwitchToPage("connectionHotkeys", hotkeyView, true)
+		AddPage("databaseHotkeys", databaseHotkeys, true, false).
+		AddAndSwitchToPage("connectionHotkeys", connectionHotkeys, true)
+
 	header := headerPanel(NewConnection(), hotkeys)
 
 	content := tview.NewPages()
@@ -103,6 +104,26 @@ func (app *App) setInputHandler() {
 				}
 				return event
 			}
+		} else if currentHotkeys == "databaseHotkeys" {
+			// Handle database view hotkeys
+			switch event.Rune() {
+			case 'q':
+				app.Stop()
+				return nil
+			case 'b':
+				app.returnToConnectionsView()
+				return nil
+			case 'r':
+				app.refreshCurrentConnection()
+				return nil
+			}
+
+			// Handle special keys
+			switch event.Key() {
+			case tcell.KeyESC:
+				app.returnToConnectionsView()
+				return nil
+			}
 		}
 
 		return event
@@ -128,6 +149,7 @@ func (app *App) showDeleteConfirmation(connection Connection) {
 				if err != nil {
 					log.Fatal("Could not delete connection", err)
 				}
+
 				app.refreshConnections()
 			}
 			app.pages.RemovePage(CONFIRM_DELETE)
@@ -147,7 +169,17 @@ func (app *App) showInfoModal(page, body string, escapeFunc func()) {
 	app.pages.AddPage(page, confirmDeleteModal, true, true)
 }
 
+func (app *App) refreshCurrentConnection() {
+	connection := app.connections.getConnection()
+	if connection != nil {
+		app.openConnection(*connection)
+	}
+}
+
 func (app *App) returnToConnectionsView() {
+	// Switch back to connection hotkeys
+	app.hotkeys.SwitchToPage("connectionHotkeys")
+
 	newHeader := newLayout(tview.FlexRow, headerPanel(NewConnection(), app.hotkeys), app.content)
 	app.pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
 	app.content.RemovePage(DATABASE_VIEW)
@@ -165,7 +197,10 @@ func (app App) openConnection(connection Connection) {
 	dbTable := newDbTable(db.openTable)
 	dbContent := newContentBox(db.openTable.name, dbTable)
 
-	newHeader := newLayout(tview.FlexRow, headerPanel(connection, app.hotkeys), app.content)
+	app.hotkeys.SwitchToPage("databaseHotkeys")
+
+	layoutHeader := headerPanel(connection, app.hotkeys)
+	newHeader := newLayout(tview.FlexRow, layoutHeader, app.content)
 	app.pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
 
 	app.content.AddAndSwitchToPage(DATABASE_VIEW, dbContent, true)
