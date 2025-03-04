@@ -56,99 +56,108 @@ func (app *App) setInputHandler() {
 		currentHotkeys, _ := app.hotkeys.GetFrontPage()
 		contentView, _ := app.content.GetFrontPage()
 
-		switch currentHotkeys {
-		case "connectionHotkeys":
-			if pageName == NEW_CONNECTION_FORM {
-				return event
-			}
+		// Skip handling if we're in the connection form
+		if pageName == NEW_CONNECTION_FORM {
+			return event
+		}
 
+		// Handle connection hotkeys
+		if currentHotkeys == "connectionHotkeys" {
+			// Handle rune-based hotkeys
 			switch event.Rune() {
 			case 'q':
 				app.Stop()
+				return nil
 			case 'n':
-				if pageName == NEW_CONNECTION_FORM {
-					return event
-				}
-
-				addConnectionForm := newConnectionForm(app, NewConnection(), func() {
-					app.pages.RemovePage(NEW_CONNECTION_FORM)
-					app.SetFocus(app.content)
-				})
-				app.pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
-
+				app.showNewConnectionForm(NewConnection())
 				return nil
 			case 'e':
 				connection := app.connections.getConnection()
-				if connection == nil {
-					return event
+				if connection != nil {
+					app.showNewConnectionForm(*connection)
 				}
-
-				addConnectionForm := newConnectionForm(app, *connection, func() {
-					app.pages.RemovePage(NEW_CONNECTION_FORM)
-					app.SetFocus(app.content)
-				})
-				app.pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
-
 				return nil
 			case 'd':
-				// Delete connection
 				connection := app.connections.getConnection()
-				if connection == nil {
-					return event
+				if connection != nil {
+					app.showDeleteConfirmation(*connection)
 				}
-
-				confirmDeleteModal := tview.NewModal().
-					SetText("Are you sure you want to delete: " + connection.Name + "?").
-					AddButtons([]string{"Cancel", "Confirm"}).
-					SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-						if buttonLabel == "Confirm" {
-							err := DeleteConnection(connection.Name)
-							if err != nil {
-								log.Fatal("Could not delete connection", err)
-							}
-
-							app.refreshConnections()
-						}
-
-						app.pages.RemovePage("ConfirmDelete")
-						app.SetFocus(app.content)
-					})
-				app.pages.AddPage("ConfirmDelete", confirmDeleteModal, true, true)
 				return nil
 			}
 
+			// Handle special keys
 			switch event.Key() {
 			case tcell.KeyESC:
 				if contentView == DATABASE_VIEW {
-					newHeader := newLayout(tview.FlexRow, headerPanel(NewConnection(), app.hotkeys), app.content)
-					app.pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
-
-					app.content.RemovePage(DATABASE_VIEW)
-					app.SetFocus(app.content)
-
-					return event
+					app.returnToConnectionsView()
+					return nil
 				}
-
-				app.pages.RemovePage(NEW_CONNECTION_FORM)
-				app.pages.RemovePage("ConfirmDelete")
-				app.SetFocus(app.content)
+				app.closeModals()
+				return nil
 			case tcell.KeyEnter:
-				if contentView == DATABASE_VIEW || pageName == "ConfirmDelete" {
-					return event
+				if contentView != DATABASE_VIEW && pageName != CONFIRM_DELETE && pageName != CONNECTION_TEST {
+					connection := app.connections.getConnection()
+					if connection != nil {
+						app.openConnection(*connection)
+					}
 				}
-
-				connection := app.connections.getConnection()
-				if connection == nil {
-					return event
-				}
-
-				app.openConnection(*connection)
+				return event
 			}
-		default:
 		}
 
 		return event
 	})
+}
+
+// Helper methods to clean up the input handler
+func (app *App) showNewConnectionForm(connection Connection) {
+	addConnectionForm := newConnectionForm(app, connection, func() {
+		app.pages.RemovePage(NEW_CONNECTION_FORM)
+		app.SetFocus(app.content)
+	})
+	app.pages.AddPage(NEW_CONNECTION_FORM, addConnectionForm, true, true)
+}
+
+func (app *App) showDeleteConfirmation(connection Connection) {
+	confirmDeleteModal := tview.NewModal().
+		SetText("Are you sure you want to delete: " + connection.Name + "?").
+		AddButtons([]string{"Cancel", "Confirm"}).
+		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+			if buttonLabel == "Confirm" {
+				err := DeleteConnection(connection.Name)
+				if err != nil {
+					log.Fatal("Could not delete connection", err)
+				}
+				app.refreshConnections()
+			}
+			app.pages.RemovePage(CONFIRM_DELETE)
+			app.SetFocus(app.content)
+		})
+	app.pages.AddPage(CONFIRM_DELETE, confirmDeleteModal, true, true)
+}
+
+func (app *App) showInfoModal(page, body string, escapeFunc func()) {
+	confirmDeleteModal := tview.NewModal().
+		SetText(body).
+		AddButtons([]string{"Ok"}).
+		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+			escapeFunc()
+		})
+
+	app.pages.AddPage(page, confirmDeleteModal, true, true)
+}
+
+func (app *App) returnToConnectionsView() {
+	newHeader := newLayout(tview.FlexRow, headerPanel(NewConnection(), app.hotkeys), app.content)
+	app.pages.AddPage(SAVED_CONNECTIONS, newHeader, true, true)
+	app.content.RemovePage(DATABASE_VIEW)
+	app.SetFocus(app.content)
+}
+
+func (app *App) closeModals() {
+	app.pages.RemovePage(NEW_CONNECTION_FORM)
+	app.pages.RemovePage(CONFIRM_DELETE)
+	app.SetFocus(app.content)
 }
 
 func (app App) openConnection(connection Connection) {

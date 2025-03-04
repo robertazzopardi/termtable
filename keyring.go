@@ -187,7 +187,7 @@ func ListConnections() ([]Connection, error) {
 	var conns []Connection
 
 	if err != nil {
-		return conns, errors.New("Could not list connections")
+		return conns, errors.New("could not list connections")
 	}
 
 	for k, v := range connections {
