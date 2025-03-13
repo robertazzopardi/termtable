@@ -17,9 +17,15 @@ type App struct {
 }
 
 func NewApp() App {
+	tview.Borders.HorizontalFocus = tview.BoxDrawingsLightHorizontal
+	tview.Borders.VerticalFocus = tview.BoxDrawingsLightVertical
+	tview.Borders.TopLeftFocus = tview.BoxDrawingsLightDownAndRight
+	tview.Borders.TopRightFocus = tview.BoxDrawingsLightDownAndLeft
+	tview.Borders.BottomLeftFocus = tview.BoxDrawingsLightUpAndRight
+	tview.Borders.BottomRightFocus = tview.BoxDrawingsLightUpAndLeft
+
 	app := tview.NewApplication()
 
-	// Create pages for different hotkey sets
 	connectionHotkeys := GetConnectionHotkeys()
 	databaseHotkeys := GetDatabaseHotkeys()
 
@@ -47,7 +53,26 @@ func NewApp() App {
 func (app *App) refreshConnections() {
 	connectionsTable := newConnectionsTable(CONNECTION_TABLE_HEADERS)
 	connectionsView := newContentBox("Connections", connectionsTable)
-	app.content.AddPage(SAVED_CONNECTIONS, connectionsView, true, true)
+
+	searchBar := tview.NewInputField().
+		SetFieldWidth(0).
+		SetAcceptanceFunc(tview.InputFieldInteger).
+		SetDoneFunc(func(key tcell.Key) {
+			app.Stop()
+		})
+	searchBar.SetBorder(true)
+	searchBar.SetFieldBackgroundColor(tcell.ColorNone)
+	container := tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(searchBar, 3, 0, false).
+		AddItem(connectionsView, 0, 1, false)
+
+	container.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		connectionsView.InputHandler()(event, func(p tview.Primitive) {})
+		return event
+	})
+
+	app.content.AddPage(SAVED_CONNECTIONS, container, true, true)
 	app.connections = connectionsTable
 }
 
@@ -57,14 +82,11 @@ func (app *App) setInputHandler() {
 		currentHotkeys, _ := app.hotkeys.GetFrontPage()
 		contentView, _ := app.content.GetFrontPage()
 
-		// Skip handling if we're in the connection form
 		if pageName == NEW_CONNECTION_FORM {
 			return event
 		}
 
-		// Handle connection hotkeys
 		if currentHotkeys == "connectionHotkeys" {
-			// Handle rune-based hotkeys
 			switch event.Rune() {
 			case 'q':
 				app.Stop()
@@ -85,14 +107,12 @@ func (app *App) setInputHandler() {
 				}
 				return nil
 			case 'o':
-				// Open selected connection
 				connection := app.connections.getConnection()
 				if connection != nil {
 					app.openConnection(*connection)
 				}
 				return nil
 			case 't':
-				// Test selected connection
 				connection := app.connections.getConnection()
 				if connection != nil {
 					testResult := connection.TestConnection()
@@ -109,19 +129,15 @@ func (app *App) setInputHandler() {
 				}
 				return nil
 			case 'r':
-				// Refresh connections list
 				app.refreshConnections()
 				return nil
 			case '/':
-				// Show search input
 				app.showSearchInput()
 				return nil
 			case 's':
-				// Sort connections by name
 				app.sortConnectionsByName()
 				return nil
-			case 'h':
-				// Show help view
+			case '?':
 				app.showHelpView()
 				return nil
 			}
@@ -157,39 +173,30 @@ func (app *App) setInputHandler() {
 				app.refreshCurrentConnection()
 				return nil
 			case 'e':
-				// Execute custom query
 				app.showQueryEditor()
 				return nil
 			case 'x':
-				// Export results
 				app.showExportOptions()
 				return nil
 			case 'f':
-				// Filter results
 				app.showFilterInput()
 				return nil
 			case 'c':
-				// Copy row
 				app.copySelectedRow()
 				return nil
 			case 'y':
-				// Copy cell
 				app.copySelectedCell()
 				return nil
 			case 'n':
-				// Next page
 				app.goToNextPage()
 				return nil
 			case 'p':
-				// Previous page
 				app.goToPreviousPage()
 				return nil
 			case 'v':
-				// Toggle view mode
 				app.toggleViewMode()
 				return nil
-			case 'h':
-				// Show help view
+			case '?':
 				app.showHelpView()
 				return nil
 			}

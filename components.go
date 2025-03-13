@@ -7,7 +7,6 @@ import (
 	"github.com/rivo/tview"
 )
 
-// currentConnectionInfo creates a list view showing connection details
 func currentConnectionInfo(conn Connection) *tview.List {
 	list := tview.NewList().
 		ShowSecondaryText(false).
@@ -21,7 +20,6 @@ func currentConnectionInfo(conn Connection) *tview.List {
 	return list
 }
 
-// headerPanel creates the header panel with connection info and hotkeys
 func headerPanel(conn Connection, hotkeys *tview.Pages) *tview.Flex {
 	connection := currentConnectionInfo(conn)
 
@@ -36,7 +34,6 @@ func headerPanel(conn Connection, hotkeys *tview.Pages) *tview.Flex {
 	return headerView
 }
 
-// newConnectionForm creates a form for adding/editing connections
 func newConnectionForm(app *App, conn Connection, escapeFunc func()) *tview.Flex {
 	form := tview.NewForm().
 		AddInputField("Name", conn.Name, 26, nil, func(text string) { conn.Name = text }).
