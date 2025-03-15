@@ -9,11 +9,12 @@ import (
 
 type App struct {
 	*tview.Application
-	conn        Connection
-	pages       *tview.Pages
-	content     *tview.Pages
-	hotkeys     *tview.Pages
-	connections *DisplayTable
+	conn            Connection
+	pages           *tview.Pages
+	content         *tview.Pages
+	hotkeys         *tview.Pages
+	connections     *DisplayTable
+	connectionsView *ContentBox
 }
 
 func NewApp() App {
@@ -43,7 +44,7 @@ func NewApp() App {
 
 	app.SetRoot(pages, true).SetFocus(content)
 
-	ctx := App{app, NewConnection(), pages, content, hotkeys, &DisplayTable{}}
+	ctx := App{app, NewConnection(), pages, content, hotkeys, &DisplayTable{}, nil}
 	ctx.setInputHandler()
 	ctx.refreshConnections()
 
@@ -54,26 +55,9 @@ func (app *App) refreshConnections() {
 	connectionsTable := newConnectionsTable(CONNECTION_TABLE_HEADERS)
 	connectionsView := newContentBox("Connections", connectionsTable)
 
-	searchBar := tview.NewInputField().
-		SetFieldWidth(0).
-		SetAcceptanceFunc(tview.InputFieldInteger).
-		SetDoneFunc(func(key tcell.Key) {
-			app.Stop()
-		})
-	searchBar.SetBorder(true)
-	searchBar.SetFieldBackgroundColor(tcell.ColorNone)
-	container := tview.NewFlex().
-		SetDirection(tview.FlexRow).
-		AddItem(searchBar, 3, 0, false).
-		AddItem(connectionsView, 0, 1, false)
-
-	container.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		connectionsView.InputHandler()(event, func(p tview.Primitive) {})
-		return event
-	})
-
-	app.content.AddPage(SAVED_CONNECTIONS, container, true, true)
+	app.content.AddPage(SAVED_CONNECTIONS, connectionsView, true, true)
 	app.connections = connectionsTable
+	app.connectionsView = connectionsView
 }
 
 func (app *App) setInputHandler() {
@@ -82,7 +66,10 @@ func (app *App) setInputHandler() {
 		currentHotkeys, _ := app.hotkeys.GetFrontPage()
 		contentView, _ := app.content.GetFrontPage()
 
-		if pageName == NEW_CONNECTION_FORM {
+		if pageName == NEW_CONNECTION_FORM || app.connectionsView.searchBar != nil {
+			if event.Key() == tcell.KeyEscape {
+				app.connectionsView.toggleSearchBar()
+			}
 			return event
 		}
 
@@ -349,34 +336,8 @@ func (app App) openConnection(connection Connection) {
 	app.SetFocus(app.content)
 }
 
-// Search functionality
 func (app *App) showSearchInput() {
-	var inputField *tview.InputField
-	inputField = tview.NewInputField().
-		SetLabel("Search: ").
-		SetFieldWidth(30).
-		SetDoneFunc(func(key tcell.Key) {
-			if key == tcell.KeyEnter {
-				searchTerm := inputField.GetText()
-				app.searchConnections(searchTerm)
-				app.pages.RemovePage("searchInput")
-				app.SetFocus(app.content)
-			} else if key == tcell.KeyEscape {
-				app.pages.RemovePage("searchInput")
-				app.SetFocus(app.content)
-			}
-		})
-
-	modal := tview.NewFlex().
-		AddItem(nil, 0, 1, false).
-		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
-			AddItem(nil, 0, 1, false).
-			AddItem(inputField, 3, 1, true).
-			AddItem(nil, 0, 1, false), 40, 1, true).
-		AddItem(nil, 0, 1, false)
-
-	app.pages.AddPage("searchInput", modal, true, true)
-	app.SetFocus(inputField)
+	app.connectionsView.toggleSearchBar()
 }
 
 func (app *App) searchConnections(term string) {
