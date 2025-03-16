@@ -1,6 +1,10 @@
 package main
 
-import "github.com/rivo/tview"
+import (
+	"strings"
+
+	"github.com/rivo/tview"
+)
 
 type DisplayTable struct {
 	*tview.Table
@@ -48,6 +52,33 @@ func (t *DisplayTable) getConnection() *Connection {
 	}
 
 	return &t.rows[row-1]
+}
+
+func (t *DisplayTable) updateTable(filter string) {
+	t.Clear()
+
+	for i, header := range t.columns {
+		t.SetCell(0, i, tview.NewTableCell(header).SetExpansion(1))
+	}
+
+	row := 1
+	for _, conn := range t.rows {
+		lowerFilter := strings.ToLower(filter)
+
+		if filter == "" ||
+			strings.Contains(strings.ToLower(conn.Host), lowerFilter) ||
+			strings.Contains(strings.ToLower(conn.User), lowerFilter) ||
+			strings.Contains(strings.ToLower(conn.Database), lowerFilter) ||
+			strings.Contains(strings.ToLower(conn.Name), lowerFilter) {
+
+			values := conn.Row()
+			for j, value := range values {
+				t.SetCell(row, j, tview.NewTableCell(value))
+			}
+
+			row++
+		}
+	}
 }
 
 type DbTable struct {

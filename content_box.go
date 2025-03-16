@@ -24,7 +24,7 @@ func newContentBox(title string, content tview.Primitive) *ContentBox {
 	return &ContentBox{container, content, box, nil}
 }
 
-func (b *ContentBox) toggleSearchBar() {
+func (b *ContentBox) toggleSearchBar(searchFunc func(value string)) {
 	if b.searchBar != nil {
 		searchBar := b.GetItem(0)
 		b.searchBar = nil
@@ -33,7 +33,7 @@ func (b *ContentBox) toggleSearchBar() {
 	}
 
 	// Add the search bar re-adding the content so ordering is preserved
-	searchBar := newSearchBar()
+	searchBar := newSearchBar(searchFunc)
 	b.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		searchBar.InputHandler()(event, func(p tview.Primitive) {})
 		return event
@@ -64,11 +64,10 @@ func (b *ContentBox) InputHandler() func(event *tcell.EventKey, setFocus func(p 
 	})
 }
 
-func newSearchBar() *tview.InputField {
+func newSearchBar(apply func(value string)) *tview.InputField {
 	searchBar := tview.NewInputField().
 		SetFieldWidth(0).
-		SetDoneFunc(func(key tcell.Key) {
-		})
+		SetChangedFunc(apply)
 	searchBar.SetBorder(true)
 	searchBar.SetFieldBackgroundColor(tcell.ColorNone)
 

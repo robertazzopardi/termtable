@@ -68,8 +68,10 @@ func (app *App) setInputHandler() {
 
 		if pageName == NEW_CONNECTION_FORM || app.connectionsView.searchBar != nil {
 			if event.Key() == tcell.KeyEscape {
-				app.connectionsView.toggleSearchBar()
+				app.connectionsView.toggleSearchBar(nil)
+				app.connections.getConnections()
 			}
+
 			return event
 		}
 
@@ -337,12 +339,9 @@ func (app App) openConnection(connection Connection) {
 }
 
 func (app *App) showSearchInput() {
-	app.connectionsView.toggleSearchBar()
-}
-
-func (app *App) searchConnections(term string) {
-	// Implementation would filter the connections table based on the search term
-	// This is a placeholder - actual implementation would depend on your data structure
+	app.connectionsView.toggleSearchBar(func(value string) {
+		app.connections.updateTable(value)
+	})
 }
 
 // Sorting functionality
