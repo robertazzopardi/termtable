@@ -4,15 +4,8 @@ import "log"
 
 type ViewMode string
 
-const (
-	TABLES ViewMode = "TABLES"
-	OPEN   ViewMode = "OPEN"
-	QUIT   ViewMode = "QUIT"
-)
-
 type OpenDatabase struct {
 	tables    []string
-	viewMode  ViewMode
 	params    Connection
 	openTable Table
 }
@@ -21,9 +14,8 @@ func NewOpenDatabase(connParams Connection) OpenDatabase {
 	databaseTables := connParams.GetTableNames()
 
 	openDatabase := OpenDatabase{
-		tables:   databaseTables,
-		viewMode: TABLES,
-		params:   connParams,
+		tables: databaseTables,
+		params: connParams,
 	}
 
 	openDatabase.setOpenTable()
@@ -32,6 +24,10 @@ func NewOpenDatabase(connParams Connection) OpenDatabase {
 }
 
 func (db *OpenDatabase) setOpenTable() {
+	if len(db.tables) == 0 {
+		return
+	}
+
 	tableName := db.tables[0]
 
 	table, err := db.params.SelectAll(tableName)
