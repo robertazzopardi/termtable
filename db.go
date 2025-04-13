@@ -60,16 +60,47 @@ func (params *Connection) TestConnection() TestStatus {
 	return PASSED
 }
 
-func (parmas Connection) GetTableNames() []string {
+func (params Connection) GetSchemas() []string {
+	connectionString := params.ConnectionString()
+	conn, err := pgx.Connect(context.Background(), connectionString)
+	if err != nil {
+		return nil
+	}
+
+	rows, err := conn.Query(context.Background(), "SELECT schema_name FROM information_schema.schemata")
+	if err != nil {
+		return nil
+	}
+
+	var schemaNames []string
+
+	for rows.Next() {
+		var schemaName string
+
+		err = rows.Scan(&schemaName)
+		if err != nil {
+			return nil
+		}
+
+		schemaNames = append(schemaNames, schemaName)
+	}
+
+	conn.Close(context.Background())
+
+	return schemaNames
+}
+
+func (parmas Connection) GetTableNames(schema string) []string {
 	connectionString := parmas.ConnectionString()
 	conn, err := pgx.Connect(context.Background(), connectionString)
 	if err != nil {
 		return nil
 	}
 
-	rows, err := conn.Query(context.Background(), "SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+	query := fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema = '%s'", schema)
+	rows, err := conn.Query(context.Background(), query)
 	if err != nil {
-		return nil
+		return []string{"No tables in schema"}
 	}
 
 	var tableNames []string

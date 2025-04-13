@@ -38,6 +38,7 @@ const (
 	NEW_CONNECTION_FORM = "newConnection"
 	SAVED_CONNECTIONS   = "savedConnections"
 	DATABASE_VIEW       = "databaseView"
+	SCHEMA_VIEW         = "schemaView"
 	CONNECTION_TEST     = "ConntectionTest"
 	CONFIRM_DELETE      = "ConfirmDelete"
 )

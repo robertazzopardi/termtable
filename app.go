@@ -14,6 +14,7 @@ type App struct {
 	content         *tview.Pages
 	hotkeys         *tview.Pages
 	connections     *DisplayTable
+	databaseTable   *DbTable
 	connectionsView *ContentBox
 }
 
@@ -44,7 +45,7 @@ func NewApp() App {
 
 	app.SetRoot(pages, true).SetFocus(content)
 
-	ctx := App{app, NewConnection(), pages, content, hotkeys, &DisplayTable{}, nil}
+	ctx := App{app, NewConnection(), pages, content, hotkeys, &DisplayTable{}, nil, nil}
 	ctx.setInputHandler()
 	ctx.refreshConnections()
 
@@ -75,128 +76,145 @@ func (app *App) setInputHandler() {
 			return event
 		}
 
-		if currentHotkeys == "connectionHotkeys" {
-			switch event.Rune() {
-			case 'q':
-				app.Stop()
-				return nil
-			case 'n':
-				app.showNewConnectionForm(NewConnection())
-				return nil
-			case 'e':
-				connection := app.connections.getConnection()
-				if connection != nil {
-					app.showNewConnectionForm(*connection)
-				}
-				return nil
-			case 'd':
-				connection := app.connections.getConnection()
-				if connection != nil {
-					app.showDeleteConfirmation(*connection)
-				}
-				return nil
-			case 'o':
-				connection := app.connections.getConnection()
-				if connection != nil {
-					app.openConnection(*connection)
-				}
-				return nil
-			case 't':
-				connection := app.connections.getConnection()
-				if connection != nil {
-					testResult := connection.TestConnection()
-					closeModal := func() {
-						app.pages.RemovePage(CONNECTION_TEST)
-					}
-
-					switch testResult {
-					case PASSED:
-						app.showInfoModal(CONNECTION_TEST, "Connection successful!", closeModal)
-					case FAILED:
-						app.showInfoModal(CONNECTION_TEST, "Connection failed. Please check your settings.", closeModal)
-					}
-				}
-				return nil
-			case 'r':
-				app.refreshConnections()
-				return nil
-			case '/':
-				app.showSearchInput()
-				return nil
-			case 's':
-				app.sortConnectionsByName()
-				return nil
-			case '?':
-				app.showHelpView()
-				return nil
-			}
-
-			// Handle special keys
-			switch event.Key() {
-			case tcell.KeyESC:
-				if contentView == DATABASE_VIEW {
-					app.returnToConnectionsView()
+		switch currentHotkeys {
+		case "connectionHotkeys":
+			{
+				switch event.Rune() {
+				case 'q':
+					app.Stop()
 					return nil
-				}
-				app.closeModals()
-				return nil
-			case tcell.KeyEnter:
-				if contentView != DATABASE_VIEW && pageName != CONFIRM_DELETE && pageName != CONNECTION_TEST {
+				case 'n':
+					app.showNewConnectionForm(NewConnection())
+					return nil
+				case 'e':
+					connection := app.connections.getConnection()
+					if connection != nil {
+						app.showNewConnectionForm(*connection)
+					}
+					return nil
+				case 'd':
+					connection := app.connections.getConnection()
+					if connection != nil {
+						app.showDeleteConfirmation(*connection)
+					}
+					return nil
+				case 'o':
 					connection := app.connections.getConnection()
 					if connection != nil {
 						app.openConnection(*connection)
 					}
-				}
-				return event
-			}
-		} else if currentHotkeys == "databaseHotkeys" {
-			// Handle database view hotkeys
-			switch event.Rune() {
-			case 'q':
-				app.Stop()
-				return nil
-			case 'b':
-				app.returnToConnectionsView()
-				return nil
-			case 'r':
-				app.refreshCurrentConnection()
-				return nil
-			case 'e':
-				app.showQueryEditor()
-				return nil
-			case 'x':
-				app.showExportOptions()
-				return nil
-			case 'f':
-				app.showFilterInput()
-				return nil
-			case 'c':
-				app.copySelectedRow()
-				return nil
-			case 'y':
-				app.copySelectedCell()
-				return nil
-			case 'n':
-				app.goToNextPage()
-				return nil
-			case 'p':
-				app.goToPreviousPage()
-				return nil
-			case 'v':
-				app.toggleViewMode()
-				return nil
-			case '?':
-				app.showHelpView()
-				return nil
-			}
+					return nil
+				case 't':
+					connection := app.connections.getConnection()
+					if connection != nil {
+						testResult := connection.TestConnection()
+						closeModal := func() {
+							app.pages.RemovePage(CONNECTION_TEST)
+						}
 
-			// Handle special keys
-			switch event.Key() {
-			case tcell.KeyESC:
-				app.returnToConnectionsView()
-				return nil
+						switch testResult {
+						case PASSED:
+							app.showInfoModal(CONNECTION_TEST, "Connection successful!", closeModal)
+						case FAILED:
+							app.showInfoModal(CONNECTION_TEST, "Connection failed. Please check your settings.", closeModal)
+						}
+					}
+					return nil
+				case 'r':
+					app.refreshConnections()
+					return nil
+				case '/':
+					app.showSearchInput()
+					return nil
+				case 's':
+					app.sortConnectionsByName()
+					return nil
+				case '?':
+					app.showHelpView()
+					return nil
+				}
+
+				// Handle special keys
+				switch event.Key() {
+				case tcell.KeyESC:
+					if contentView == DATABASE_VIEW {
+						app.returnToConnectionsView()
+
+						return nil
+					}
+					app.closeModals()
+
+					return nil
+				case tcell.KeyEnter:
+					if contentView != DATABASE_VIEW && pageName != CONFIRM_DELETE && pageName != CONNECTION_TEST {
+						connection := app.connections.getConnection()
+						if connection != nil {
+							app.openConnection(*connection)
+						}
+					}
+
+					return event
+				}
 			}
-		} else if currentHotkeys == "helpHotkeys" {
+		case "databaseHotkeys":
+			{
+				// Handle database view hotkeys
+				switch event.Rune() {
+				case 'q':
+					app.Stop()
+					return nil
+				case 'b':
+					app.returnToConnectionsView()
+					return nil
+				case 'r':
+					app.refreshCurrentConnection()
+					return nil
+				case 'e':
+					app.showQueryEditor()
+					return nil
+				case 'x':
+					app.showExportOptions()
+					return nil
+				case 'f':
+					app.showFilterInput()
+					return nil
+				case 'c':
+					app.copySelectedRow()
+					return nil
+				case 'y':
+					app.copySelectedCell()
+					return nil
+				case 'n':
+					app.goToNextPage()
+					return nil
+				case 'p':
+					app.goToPreviousPage()
+					return nil
+				case 'v':
+					app.toggleViewMode()
+					return nil
+				case '?':
+					app.showHelpView()
+					return nil
+				}
+
+				// Handle special keys
+				switch event.Key() {
+				case tcell.KeyESC:
+					app.returnToConnectionsView()
+					return nil
+				case tcell.KeyEnter:
+					if contentView == DATABASE_VIEW && app.databaseTable.db.schema != "" {
+						app.databaseTable.showTables()
+					} else if contentView == DATABASE_VIEW && app.databaseTable.db.schema == "" {
+						app.databaseTable.showSchema()
+					} else {
+						panic(contentView)
+					}
+
+				}
+			}
+		case "helpHotkeys":
 			// Handle help view hotkeys
 			switch event.Rune() {
 			case 'q':
@@ -213,7 +231,8 @@ func (app *App) setInputHandler() {
 				app.closeHelpView()
 				return nil
 			}
-		} else if currentHotkeys == "queryHotkeys" {
+
+		case "queryHotkeys":
 			// Handle query editor hotkeys
 			switch event.Key() {
 			case tcell.KeyESC:
@@ -235,7 +254,8 @@ func (app *App) setInputHandler() {
 				app.showQueryHistory()
 				return nil
 			}
-		} else if currentHotkeys == "exportHotkeys" {
+
+		case "exportHotkeys":
 			// Handle export options hotkeys
 			switch event.Rune() {
 			case 'c':
@@ -255,6 +275,8 @@ func (app *App) setInputHandler() {
 				app.closeExportOptions()
 				return nil
 			}
+
+			return event
 		}
 
 		return event
@@ -323,10 +345,12 @@ func (app *App) closeModals() {
 	app.SetFocus(app.content)
 }
 
-func (app App) openConnection(connection Connection) {
+func (app *App) openConnection(connection Connection) {
 	db := NewOpenDatabase(connection)
-	dbTable := newDbTable(db.openTable)
+	dbTable := newDbTable(db)
 	dbContent := newContentBox(db.openTable.name, dbTable)
+
+	app.databaseTable = dbTable
 
 	app.hotkeys.SwitchToPage("databaseHotkeys")
 
@@ -520,12 +544,13 @@ func (app *App) showFilterInput() {
 		SetLabel("Filter: ").
 		SetFieldWidth(30).
 		SetDoneFunc(func(key tcell.Key) {
-			if key == tcell.KeyEnter {
+			switch key {
+			case tcell.KeyEnter:
 				filterTerm := inputField.GetText()
 				app.filterResults(filterTerm)
 				app.pages.RemovePage("filterInput")
 				app.SetFocus(app.content)
-			} else if key == tcell.KeyEscape {
+			case tcell.KeyEscape:
 				app.pages.RemovePage("filterInput")
 				app.SetFocus(app.content)
 			}

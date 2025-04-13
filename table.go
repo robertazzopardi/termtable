@@ -83,29 +83,53 @@ func (t *DisplayTable) updateTable(filter string) {
 
 type DbTable struct {
 	*tview.Table
-	table Table
+	db OpenDatabase
 }
 
-func newDbTable(table Table) *DbTable {
+func newDbTable(db OpenDatabase) *DbTable {
 	t := tview.NewTable()
+	t.SetBorderPadding(0, 0, 1, 1)
+	t.SetSelectable(true, false).Select(1, 0)
+
+	connectionsTable := DbTable{t, db}
+	connectionsTable.setTableRows()
+
+	return &connectionsTable
+}
+
+func (t *DbTable) setTableRows() {
+	table := t.db.openTable
 
 	for i, header := range table.fields {
 		t.SetCell(0, i, tview.NewTableCell(header).SetExpansion(1))
 	}
 
-	t.SetBorderPadding(0, 0, 1, 1)
-	t.SetSelectable(true, false).Select(1, 0)
-
-	connectionsTable := DbTable{t, table}
-	connectionsTable.getTableRows()
-
-	return &connectionsTable
-}
-
-func (t *DbTable) getTableRows() {
-	for i, conn := range t.table.values {
-		for j, value := range conn {
+	for i, value := range t.db.openTable.values {
+		for j, value := range value {
 			t.SetCell(i+1, j, tview.NewTableCell(value))
 		}
 	}
+}
+
+func (t *DbTable) showSchema() {
+	row, col := t.GetSelection()
+
+	cell := t.GetCell(row, col)
+	t.db.setSchema(cell.Text)
+
+	t.db.getTablesInSchema()
+
+	t.Clear().ScrollToBeginning()
+
+	t.setTableRows()
+}
+
+func (t *DbTable) showTables() {
+	row, _ := t.GetSelection()
+
+	t.db.setOpenTable(row)
+
+	t.Clear().ScrollToBeginning()
+
+	t.setTableRows()
 }
