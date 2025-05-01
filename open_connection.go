@@ -1,209 +1,72 @@
 package main
 
 import (
-	"fmt"
-	"io"
-	"strings"
-
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/table"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-)
-
-var (
-	modelStyle = lipgloss.
-			NewStyle().
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Color(GREY))
-	focusedModelStyle = lipgloss.
-				NewStyle().
-				BorderStyle(lipgloss.NormalBorder()).
-				BorderForeground(lipgloss.Color(WHITE))
-
-	focusedModelSideBarStyle = lipgloss.
-					NewStyle().
-					BorderStyle(lipgloss.NormalBorder()).
-					BorderForeground(lipgloss.Color(WHITE))
-
-	blurredModelSideBarStyle = lipgloss.
-					NewStyle().
-					Foreground(lipgloss.Color(GREY))
-	selectedTableStyle = lipgloss.
-				NewStyle().
-				Foreground(lipgloss.Color(MAGENTA))
+	"log"
 )
 
 type ViewMode string
 
-const (
-	TABLES ViewMode = "TABLES"
-	OPEN   ViewMode = "OPEN"
-	QUIT   ViewMode = "QUIT"
-)
-
-type tableItem string
-
-func (i tableItem) FilterValue() string { return "" }
-
-type tableItemDelegate struct{}
-
-func (d tableItemDelegate) Height() int                             { return 1 }
-func (d tableItemDelegate) Spacing() int                            { return 0 }
-func (d tableItemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
-func (d tableItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
-	str, ok := listItem.(tableItem)
-	if !ok {
-		return
-	}
-
-	fn := blurredModelSideBarStyle.Render
-	if index == m.Index() {
-		fn = func(s ...string) string {
-			return selectedTableStyle.Render(strings.Join(s, " "))
-		}
-	}
-
-	fmt.Fprint(w, fn(string(str)))
-}
-
 type OpenDatabase struct {
-	tables        list.Model
-	viewMode      ViewMode
-	selectedTable table.Model
-	params        Connection
+	params    Connection
+	openTable Table
+	schema    string
 }
 
 func NewOpenDatabase(connParams Connection) OpenDatabase {
-	databaseTables := connParams.GetTableNames()
-
-	listItems := []list.Item{}
-	for _, value := range databaseTables {
-		listItems = append(listItems, tableItem(value))
-	}
-
 	openDatabase := OpenDatabase{
-		tables:   list.New(listItems, tableItemDelegate{}, 14, 14),
-		viewMode: TABLES,
-		params:   connParams,
+		params: connParams,
 	}
 
-	openDatabase.tables.SetShowHelp(false)
-	openDatabase.tables.SetShowTitle(false)
-	openDatabase.tables.SetShowStatusBar(false)
-
-	openDatabase.setOpenTable()
+	openDatabase.setSchemas()
 
 	return openDatabase
 }
 
-func (db *OpenDatabase) setOpenTable() {
-	selectedItem := db.tables.SelectedItem()
-	tableName := string(selectedItem.(tableItem))
+func (db *OpenDatabase) setSchemas() {
+	schemas := db.params.GetSchemas()
 
-	selectedTable, err := db.openTable(tableName)
+	db.setTable(schemas, "schema", "schema_names")
+}
 
-	if err != nil {
-		db.params.status = DISCONNECTED
+func (db *OpenDatabase) getTablesInSchema() {
+	tables := db.params.GetTableNames(db.schema)
+
+	db.setTable(tables, "table", "table_names")
+}
+
+func (db *OpenDatabase) setTable(tables []string, name, title string) {
+	if len(tables) == 0 {
 		return
 	}
 
-	db.selectedTable = selectedTable
-	db.selectedTable.SetWidth(width / 2)
-	db.selectedTable.SetHeight(height / 2)
+	rows := make([][]string, len(tables))
+
+	for i, table := range tables {
+		rows[i] = []string{table}
+	}
+
+	db.openTable = Table{name: name, fields: []string{title}, values: rows}
 }
 
-func (db OpenDatabase) openTable(tableName string) (table.Model, error) {
-	tableData, err := db.params.SelectAll(tableName)
+func (db *OpenDatabase) setOpenTable(index int) {
+	tables := db.params.GetTableNames(db.schema)
 
+	if len(tables) <= index {
+		return
+	}
+
+	tableName := tables[index]
+
+	table, err := db.params.SelectAll(tableName)
 	if err != nil {
-		return db.selectedTable, err
+		log.Fatal("Could not connect to db", err)
+
+		return
 	}
 
-	max_len := db.selectedTable.Width() / len(tableData.fields)
-	columns := make([]table.Column, len(tableData.fields))
-	for i, field := range tableData.fields {
-		columns[i] = table.Column{Title: field, Width: max_len}
-	}
-
-	rows := make([]table.Row, len(tableData.values))
-	for i, value := range tableData.values {
-		rows[i] = make(table.Row, len(value))
-		copy(rows[i], value)
-	}
-
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithFocused(true),
-	)
-
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(false)
-	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	t.SetStyles(s)
-
-	return t, nil
+	db.openTable = table
 }
 
-func (db OpenDatabase) Init() tea.Cmd {
-	return nil
-}
-
-func (db OpenDatabase) Update(msg tea.Msg) (OpenDatabase, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			db.viewMode = QUIT
-			return db, nil
-
-		case "left", "right":
-			switch db.viewMode {
-			case TABLES:
-				db.viewMode = OPEN
-			case OPEN:
-				db.viewMode = TABLES
-			}
-		}
-	}
-
-	var cmd tea.Cmd
-
-	switch db.viewMode {
-	case TABLES:
-		db.tables, cmd = db.tables.Update(msg)
-	case OPEN:
-		db.selectedTable, cmd = db.selectedTable.Update(msg)
-	}
-
-	return db, cmd
-}
-
-func (db OpenDatabase) View() string {
-	s := fmt.Sprintf("%s / %s\n\n", db.params.Name, db.params.Database)
-
-	tableLabels := db.tables.View()
-
-	db.setOpenTable()
-	openTable := db.selectedTable.View()
-
-	if db.viewMode == TABLES {
-		s += lipgloss.JoinHorizontal(lipgloss.Top,
-			focusedModelSideBarStyle.Render(tableLabels),
-			modelStyle.Render(openTable))
-	} else {
-		s += lipgloss.JoinHorizontal(lipgloss.Top,
-			modelStyle.Render(tableLabels),
-			focusedModelStyle.Render(openTable))
-	}
-
-	return paginationStyle.Render(s)
+func (db *OpenDatabase) setSchema(schema string) {
+	db.schema = schema
 }
